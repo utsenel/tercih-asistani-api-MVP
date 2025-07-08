@@ -63,55 +63,34 @@ class TercihAsistaniProcessor:
 
     async def _initialize_astradb(self):
         """AstraDB bağlantısını başlat"""
-        try:
-            from astrapy import DataAPIClient
+    try:
+        from astrapy import DataAPIClient
+        
+        # Collection'ları listele (debug için)
+        client = DataAPIClient(token=DatabaseSettings.ASTRA_DB_TOKEN)
+        database = client.get_database_by_api_endpoint(DatabaseSettings.ASTRA_DB_API_ENDPOINT)
+        collections = list(database.list_collection_names())
+        logger.info(f"Mevcut collection'lar: {collections}")
+        
+        collection_name = DatabaseSettings.ASTRA_DB_COLLECTION
+        if collection_name in collections:
+            logger.info(f"Mevcut collection kullanılıyor: {collection_name}")
             
-            # Collection'ları listele (debug için)
-            client = DataAPIClient(token=DatabaseSettings.ASTRA_DB_TOKEN)
-            database = client.get_database_by_api_endpoint(DatabaseSettings.ASTRA_DB_API_ENDPOINT)
-            collections = list(database.list_collection_names())
-            logger.info(f"Mevcut collection'lar: {collections}")
-            
-            collection_name = DatabaseSettings.ASTRA_DB_COLLECTION
-            if collection_name in collections:
-                logger.info(f"Mevcut collection kullanılıyor: {collection_name}")
-                
-                # Collection'ın mevcut olup olmadığını kontrol et
-                autodetect = collection_name in collections
-                
-                # Langflow tarzı AstraDBVectorStore yapılandırması
-                self.vectorstore = AstraDBVectorStore(
-                    # Temel parametreler
-                    token=DatabaseSettings.ASTRA_DB_TOKEN,
-                    api_endpoint=DatabaseSettings.ASTRA_DB_API_ENDPOINT,
-                    collection_name=collection_name,
-                    
-                    # Astra Vectorize kullanımı için
-                    embedding=None,  # Astra Vectorize
-                    
-                    # Langflow'daki autodetect mantığı
-                    autodetect_collection=autodetect,
-                    
-                    # Content field ayarları (Langflow'dan)
-                    content_field=None,  # Varsayılan kullan
-                    
-                    # Geçersiz dokümanları yoksay
-                    ignore_invalid_documents=True,
-                    
-                    # Namespace ayarı
-                    namespace=None  # default_keyspace kullanacak
-                )
-                logger.info("AstraDB bağlantısı başarılı (Langflow uyumlu)")
-            else:
-                logger.error(f"Collection '{collection_name}' bulunamadı!")
-                logger.info(f"Mevcut collection'lar: {collections}")
-                self.vectorstore = None
-                
-        except Exception as e:
-            logger.error(f"AstraDB bağlantı hatası: {e}")
-            import traceback
-            logger.error(f"Detaylı hata: {traceback.format_exc()}")
+            # Minimal AstraDBVectorStore
+            self.vectorstore = AstraDBVectorStore(
+                token=DatabaseSettings.ASTRA_DB_TOKEN,
+                api_endpoint=DatabaseSettings.ASTRA_DB_API_ENDPOINT,
+                collection_name=collection_name,
+                embedding=None
+            )
+            logger.info("AstraDB bağlantısı başarılı!")
+        else:
+            logger.error(f"Collection '{collection_name}' bulunamadı!")
             self.vectorstore = None
+            
+    except Exception as e:
+        logger.error(f"AstraDB bağlantı hatası: {e}")
+        self.vectorstore = None
 
     async def _initialize_csv(self):
         """CSV verilerini yükle"""
