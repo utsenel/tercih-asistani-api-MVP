@@ -9,4 +9,4 @@ python-dotenv==1.0.0
 pydantic==2.5.0
 aiofiles==23.2.1
 httpx==0.25.2
-astrapy==1.0.0
+astrapy==1.2.0
