@@ -81,7 +81,13 @@ class TercihAsistaniProcessor:
                     token=DatabaseSettings.ASTRA_DB_TOKEN,
                     api_endpoint=DatabaseSettings.ASTRA_DB_API_ENDPOINT,
                     collection_name=collection_name,
-                    embedding=None
+                    embedding=None,  # Astra Vectorize
+                    collection_vector_service_options={
+                        "provider": "OpenAI",
+                        "model": "text-embedding-3-large"
+                    },
+                    autodetect_collection=autodetect,
+                    ignore_invalid_documents=True,
                 )
                 logger.info("AstraDB bağlantısı başarılı!")
             else:
