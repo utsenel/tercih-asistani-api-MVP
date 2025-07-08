@@ -85,7 +85,6 @@ class TercihAsistaniProcessor:
                     token=DatabaseSettings.ASTRA_DB_TOKEN,
                     api_endpoint=DatabaseSettings.ASTRA_DB_API_ENDPOINT,
                     collection_name=collection_name,
-                    environment=DatabaseSettings.ASTRA_DB_ENVIRONMENT,
                     
                     # Astra Vectorize kullanımı için
                     embedding=None,  # Astra Vectorize
