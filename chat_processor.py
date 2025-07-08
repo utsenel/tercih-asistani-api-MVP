@@ -77,7 +77,7 @@ class TercihAsistaniProcessor:
                 logger.info(f"Mevcut collection kullanılıyor: {collection_name}")
 
                 # autodetect değişkenini tanımla
-                autodetect = collection_name in collections
+                #autodetect = collection_name in collections
                 
                 # Minimal AstraDBVectorStore
                 self.vectorstore = AstraDBVectorStore(
@@ -89,7 +89,7 @@ class TercihAsistaniProcessor:
                         "provider": "OpenAI",
                         "model": "text-embedding-3-large"
                     },
-                    autodetect_collection=autodetect,
+                    #autodetect_collection=autodetect,
                     ignore_invalid_documents=True,
                 )
                 logger.info("AstraDB bağlantısı başarılı!")
