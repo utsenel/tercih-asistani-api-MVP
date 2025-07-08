@@ -90,7 +90,7 @@ class TercihAsistaniProcessor:
                         "model": "text-embedding-3-large"
                     },
                     #autodetect_collection=autodetect,
-                    ignore_invalid_documents=True,
+                    #ignore_invalid_documents=True,
                 )
                 logger.info("AstraDB bağlantısı başarılı!")
             else:
