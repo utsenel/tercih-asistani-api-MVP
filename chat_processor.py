@@ -63,48 +63,48 @@ class TercihAsistaniProcessor:
 
     async def _initialize_astradb(self):
         """AstraDB bağlantısını başlat"""
-    try:
-        from astrapy import DataAPIClient
-        
-        # Collection'ları listele (debug için)
-        client = DataAPIClient(token=DatabaseSettings.ASTRA_DB_TOKEN)
-        database = client.get_database_by_api_endpoint(DatabaseSettings.ASTRA_DB_API_ENDPOINT)
-        collections = list(database.list_collection_names())
-        logger.info(f"Mevcut collection'lar: {collections}")
-        
-        collection_name = DatabaseSettings.ASTRA_DB_COLLECTION
-        if collection_name in collections:
-            logger.info(f"Mevcut collection kullanılıyor: {collection_name}")
-            
-            # Minimal AstraDBVectorStore
-            self.vectorstore = AstraDBVectorStore(
-                token=DatabaseSettings.ASTRA_DB_TOKEN,
-                api_endpoint=DatabaseSettings.ASTRA_DB_API_ENDPOINT,
-                collection_name=collection_name,
-                embedding=None
-            )
-            logger.info("AstraDB bağlantısı başarılı!")
-        else:
-            logger.error(f"Collection '{collection_name}' bulunamadı!")
-            self.vectorstore = None
-            
-    except Exception as e:
-        logger.error(f"AstraDB bağlantı hatası: {e}")
-        self.vectorstore = None
-
-    async def _initialize_csv(self):
-        """CSV verilerini yükle"""
         try:
-            csv_path = DatabaseSettings.CSV_FILE_PATH
-            if csv_path and os.path.exists(csv_path):
-                self.csv_data = pd.read_csv(csv_path)
-                logger.info(f"CSV verisi yüklendi: {len(self.csv_data)} satır")
+            from astrapy import DataAPIClient
+            
+            # Collection'ları listele (debug için)
+            client = DataAPIClient(token=DatabaseSettings.ASTRA_DB_TOKEN)
+            database = client.get_database_by_api_endpoint(DatabaseSettings.ASTRA_DB_API_ENDPOINT)
+            collections = list(database.list_collection_names())
+            logger.info(f"Mevcut collection'lar: {collections}")
+            
+            collection_name = DatabaseSettings.ASTRA_DB_COLLECTION
+            if collection_name in collections:
+                logger.info(f"Mevcut collection kullanılıyor: {collection_name}")
+                
+                # Minimal AstraDBVectorStore
+                self.vectorstore = AstraDBVectorStore(
+                    token=DatabaseSettings.ASTRA_DB_TOKEN,
+                    api_endpoint=DatabaseSettings.ASTRA_DB_API_ENDPOINT,
+                    collection_name=collection_name,
+                    embedding=None
+                )
+                logger.info("AstraDB bağlantısı başarılı!")
             else:
-                logger.warning(f"CSV dosyası bulunamadı: {csv_path}")
-                self.csv_data = None
+                logger.error(f"Collection '{collection_name}' bulunamadı!")
+                self.vectorstore = None
+                
         except Exception as e:
-            logger.warning(f"CSV yükleme hatası: {e}")
-            self.csv_data = None
+            logger.error(f"AstraDB bağlantı hatası: {e}")
+            self.vectorstore = None
+    
+        async def _initialize_csv(self):
+            """CSV verilerini yükle"""
+            try:
+                csv_path = DatabaseSettings.CSV_FILE_PATH
+                if csv_path and os.path.exists(csv_path):
+                    self.csv_data = pd.read_csv(csv_path)
+                    logger.info(f"CSV verisi yüklendi: {len(self.csv_data)} satır")
+                else:
+                    logger.warning(f"CSV dosyası bulunamadı: {csv_path}")
+                    self.csv_data = None
+            except Exception as e:
+                logger.warning(f"CSV yükleme hatası: {e}")
+                self.csv_data = None
 
     async def process_message(self, message: str, session_id: str = "default") -> Dict[str, Any]:
         """
