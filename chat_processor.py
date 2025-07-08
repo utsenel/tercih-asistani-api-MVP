@@ -236,44 +236,63 @@ class TercihAsistaniProcessor:
             logger.error(f"Vector context genel hatası: {e}")
             return f"Vector arama sırasında genel hata oluştu: {str(e)}"
 
+    import math
+    import json
+
     async def _get_csv_context(self, question: str) -> str:
-        """CSV verilerinden context al - Config'lerle"""
+        """CSV verilerini JSON chunk'layarak LLM'e aktar"""
         try:
             if self.csv_data is None:
-                return "CSV verileri mevcut değil"
-            
-            # Config'ten anahtar kelimeleri al
+                logger.warning("CSV yok")
+                return "CSV verisi yok"
+    
+            # Sorudan CSV keyword kontrolü
             question_lower = question.lower()
             has_csv_keyword = any(keyword.lower() in question_lower for keyword in CSV_KEYWORDS)
-            
-            if not has_csv_keyword:
-                # Ek kontrol: sayısal değerler (maaş, yıl, oran için)
-                has_numbers = bool(re.search(r'\d+', question))
-                if not has_numbers:
-                    return "Bu soru için CSV verisi gerekli değil"
-            
-            logger.info(f"CSV analizi gerekli: {question}")
-            
-            # CSV agent prompt ile analiz et - Config'e göre
-            if len(self.csv_data) <= CSVConfig.MAX_ROWS_FOR_FULL_ANALYSIS:
-                csv_sample = self.csv_data.to_string()
-            else:
-                csv_sample = self.csv_data.head(CSVConfig.SAMPLE_ROWS).to_string()
-            
-            result = await self.llm_csv_agent.ainvoke(
-                self.csv_agent_prompt.format(
-                    question=question,
-                    csv_data=csv_sample
+            has_numbers = bool(re.search(r'\d+', question))
+    
+            if not has_csv_keyword and not has_numbers:
+                return "Bu soru için CSV verisi gerekli değil"
+    
+            logger.info(f"CSV chunk analiz başlıyor: {question}")
+    
+            # CSV'yi JSON listesine çevir
+            csv_records = self.csv_data.to_dict(orient="records")
+    
+            # Chunk ayarları
+            chunk_size = 20   # Her chunk 20 satır
+            num_chunks = math.ceil(len(csv_records) / chunk_size)
+    
+            logger.info(f"Toplam satır: {len(csv_records)}, Chunk sayısı: {num_chunks}")
+    
+            partial_analyses = []
+    
+            for i in range(num_chunks):
+                chunk = csv_records[i * chunk_size : (i + 1) * chunk_size]
+                chunk_json = json.dumps(chunk, ensure_ascii=False)[:8000]  # 8K karakterden uzun olmasın
+    
+                # LLM çağrısı
+                result = await self.llm_csv_agent.ainvoke(
+                    self.csv_agent_prompt.format(
+                        question=question,
+                        csv_data=chunk_json
+                    )
                 )
-            )
-            
-            analysis = result.content.strip()
-            logger.info(f"CSV analiz sonucu: {analysis[:200]}...")
-            return analysis
-            
+    
+                partial = result.content.strip()
+                logger.info(f"Chunk {i+1}/{num_chunks} analiz uzunluğu: {len(partial)}")
+                partial_analyses.append(partial)
+    
+            # Tüm parça analizleri birleştir
+            combined = "\n\n".join(partial_analyses)
+    
+            logger.info(f"Tüm CSV analiz tamam: {len(combined)} karakter")
+            return combined
+    
         except Exception as e:
-            logger.error(f"CSV analiz hatası: {e}")
-            return "CSV analizi sırasında hata oluştu"
+            logger.error(f"Chunk CSV analiz hatası: {e}")
+            return "CSV analizinde chunklama hatası oluştu"
+
 
     async def _generate_final_response(self, question: str, context1: str, context2: str) -> str:
         """Final yanıtı oluştur"""
