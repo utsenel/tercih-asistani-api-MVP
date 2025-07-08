@@ -68,7 +68,8 @@ class TercihAsistaniProcessor:
             
             # Collection'ları listele (debug için)
             client = DataAPIClient(token=DatabaseSettings.ASTRA_DB_TOKEN)
-            database = client.get_database(api_endpoint=DatabaseSettings.ASTRA_DB_API_ENDPOINT)
+        """   database = client.get_database(api_endpoint=DatabaseSettings.ASTRA_DB_API_ENDPOINT) """
+            database = client.get_database_by_api_endpoint(DatabaseSettings.ASTRA_DB_API_ENDPOINT)
             collections = list(database.list_collection_names())
             logger.info(f"Mevcut collection'lar: {collections}")
             
