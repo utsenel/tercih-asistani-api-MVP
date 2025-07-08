@@ -75,6 +75,9 @@ class TercihAsistaniProcessor:
             collection_name = DatabaseSettings.ASTRA_DB_COLLECTION
             if collection_name in collections:
                 logger.info(f"Mevcut collection kullanılıyor: {collection_name}")
+
+                # autodetect değişkenini tanımla
+                autodetect = collection_name in collections
                 
                 # Minimal AstraDBVectorStore
                 self.vectorstore = AstraDBVectorStore(
@@ -98,19 +101,19 @@ class TercihAsistaniProcessor:
             logger.error(f"AstraDB bağlantı hatası: {e}")
             self.vectorstore = None
     
-        async def _initialize_csv(self):
-            """CSV verilerini yükle"""
-            try:
-                csv_path = DatabaseSettings.CSV_FILE_PATH
-                if csv_path and os.path.exists(csv_path):
-                    self.csv_data = pd.read_csv(csv_path)
-                    logger.info(f"CSV verisi yüklendi: {len(self.csv_data)} satır")
-                else:
-                    logger.warning(f"CSV dosyası bulunamadı: {csv_path}")
-                    self.csv_data = None
-            except Exception as e:
-                logger.warning(f"CSV yükleme hatası: {e}")
+    async def _initialize_csv(self):
+        """CSV verilerini yükle"""
+        try:
+            csv_path = DatabaseSettings.CSV_FILE_PATH
+            if csv_path and os.path.exists(csv_path):
+                self.csv_data = pd.read_csv(csv_path)
+                logger.info(f"CSV verisi yüklendi: {len(self.csv_data)} satır")
+            else:
+                logger.warning(f"CSV dosyası bulunamadı: {csv_path}")
                 self.csv_data = None
+        except Exception as e:
+            logger.warning(f"CSV yükleme hatası: {e}")
+            self.csv_data = None
 
     async def process_message(self, message: str, session_id: str = "default") -> Dict[str, Any]:
         """
