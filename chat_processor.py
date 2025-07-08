@@ -6,7 +6,8 @@ import logging
 from langchain_openai import ChatOpenAI
 from langchain_astradb import AstraDBVectorStore
 from langchain_core.prompts import ChatPromptTemplate
-
+import math
+import json
 # Config imports
 from config import (
     LLMConfigs, VectorConfig, CSVConfig,
@@ -236,8 +237,7 @@ class TercihAsistaniProcessor:
             logger.error(f"Vector context genel hatası: {e}")
             return f"Vector arama sırasında genel hata oluştu: {str(e)}"
 
-    import math
-    import json
+
 
     async def _get_csv_context(self, question: str) -> str:
         """CSV verilerini JSON chunk'layarak LLM'e aktar"""
