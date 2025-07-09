@@ -8,6 +8,8 @@ from langchain_astradb import AstraDBVectorStore
 from langchain_core.prompts import ChatPromptTemplate
 import math
 import json
+import asyncio
+
 # Config imports
 from config import (
     LLMConfigs, VectorConfig, CSVConfig,
