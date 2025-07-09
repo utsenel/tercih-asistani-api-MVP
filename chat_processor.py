@@ -87,10 +87,10 @@ class TercihAsistaniProcessor:
                 logger.info(f"Collection bulundu: {collection_name}")
     
                 try:
-                    vector_service_options = (
-                        provider="openai",
-                        model_name="text-embedding-3-small"
-                    )
+                    vector_service_options = {
+                        "provider": "openai",
+                        "model_name": "text-embedding-3-small"
+                    }
     
                     self.vectorstore = AstraDBVectorStore(
                         token=DatabaseSettings.ASTRA_DB_TOKEN,
