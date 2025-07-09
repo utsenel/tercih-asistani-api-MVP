@@ -11,7 +11,7 @@ import json
 import asyncio
 import re
 from astrapy import DataAPIClient
-from langchain_openai import OpenAIEmbeddings
+#from langchain_openai import OpenAIEmbeddings
 #from astrapy.info import VectorServiceOptions
 
 # Config imports
@@ -69,7 +69,7 @@ class TercihAsistaniProcessor:
             raise
 
     async def _initialize_astradb(self):
-        """AstraDB bağlantısını başlat - Ultra minimal"""
+        """AstraDB bağlantısını başlat - Astra Vectorize kullanarak"""
         try:
             # ASYNC client
             client = DataAPIClient(token=DatabaseSettings.ASTRA_DB_TOKEN)
@@ -88,24 +88,19 @@ class TercihAsistaniProcessor:
                 logger.info(f"Collection bulundu: {collection_name}")
     
                 try:
-                    embedding = OpenAIEmbeddings(
-                        model="text-embedding-3-small",
-                        dimensions=512,  # 512 boyuta ayarla
-                        openai_api_key=os.getenv("OPENAI_API_KEY")
-                    )
-
+                    # EMBEDDİNG PARAMETRESİ VERMEDEN OLUŞTUR
+                    # Collection zaten Astra Vectorize ile yapılandırılmış
                     self.vectorstore = AstraDBVectorStore(
                         token=DatabaseSettings.ASTRA_DB_TOKEN,
                         api_endpoint=DatabaseSettings.ASTRA_DB_API_ENDPOINT,
                         collection_name=collection_name,
-                        embedding=embedding,
-                        # collection_vector_service_options parametresini kaldır
+                        # embedding parametresi YOK - Astra Vectorize kullanacak
                     )
     
-                    logger.info("✅ AstraDB VectorStore başarıyla oluşturuldu!")
+                    logger.info("✅ AstraDB VectorStore (Astra Vectorize ile) başarıyla oluşturuldu!")
     
-                    # Vector aramayı da ASYNC yapmak istersen
-                    test_docs = self.vectorstore.similarity_search("test", k=1)
+                    # Test araması
+                    test_docs = await self.vectorstore.asimilarity_search("test", k=1)
                     logger.info(f"✅ Test arama başarılı: {len(test_docs)} doküman bulundu")
     
                 except Exception as vs_error:
@@ -223,9 +218,9 @@ class TercihAsistaniProcessor:
                 logger.warning(f"Sorgu optimizasyonu başarısız, orijinal soru kullanılıyor: {e}")
                 optimized_text = question
             
-            # Vector arama yap
+            # Vector arama yap - ASYNC VERSION
             try:
-                docs = self.vectorstore.similarity_search(
+                docs = await self.vectorstore.asimilarity_search(
                     optimized_text, 
                     k=VectorConfig.SIMILARITY_TOP_K
                 )
@@ -238,9 +233,8 @@ class TercihAsistaniProcessor:
                 # Dokümanları birleştir
                 context = ""
                 for i, doc in enumerate(docs):
-                    # Metadata'dan dosya yolu al
                     file_path = doc.metadata.get('file_path', 'Bilinmeyen kaynak')
-                    content = doc.page_content[:500]  # İlk 500 karakter
+                    content = doc.page_content[:500]
                     context += f"Dosya: {file_path}\nİçerik: {content}\n\n"
                     logger.info(f"Doküman {i+1}: {file_path} - İçerik uzunluğu: {len(doc.page_content)}")
                 
@@ -254,7 +248,6 @@ class TercihAsistaniProcessor:
         except Exception as e:
             logger.error(f"Vector context genel hatası: {e}")
             return f"Vector arama sırasında genel hata oluştu: {str(e)}"
-
 
 
  
@@ -394,8 +387,9 @@ class TercihAsistaniProcessor:
         # AstraDB test
         try:
             if self.vectorstore:
-                self.vectorstore.similarity_search("test", k=1)
-                results["AstraDB"] = "✅ Bağlı"
+                # ASYNC VERSION
+                await self.vectorstore.asimilarity_search("test", k=1)
+                results["AstraDB"] = "✅ Bağlı (Astra Vectorize)"
             else:
                 results["AstraDB"] = "❌ Yapılandırılmamış"
         except Exception as e:
