@@ -167,8 +167,11 @@ class TercihAsistaniProcessor:
             )
             
             # Adım 5: Final yanıt oluşturma
+            # DEBUG LOG'LAR EKLE:
+            logger.info(f"🔍 Session ID: {session_id}")
             conversation_history = self.memory.get_history(session_id)
-            
+            logger.info(f"🧠 Memory history length: {len(conversation_history)} - Content: '{conversation_history[:100]}...'")
+           
             final_response = await self._generate_final_response(
                 question=corrected_question,
                 context1=context1,
@@ -176,9 +179,12 @@ class TercihAsistaniProcessor:
                 history=conversation_history
             )
 
+            # DEBUG LOG EKLE:
+            logger.info(f"💾 Memory'ye kaydediliyor - Session: {session_id}")
             self.memory.add_message(session_id, "user", message)
             self.memory.add_message(session_id, "assistant", final_response)
-            
+            logger.info(f"📝 Memory kayıt tamamlandı")
+
             return {
                 "response": final_response,
                 "sources": self._extract_sources(context1, context2)
