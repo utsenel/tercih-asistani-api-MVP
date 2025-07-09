@@ -149,6 +149,12 @@ class TercihAsistaniProcessor:
                     "sources": []
                 }
             
+            if evaluation_result == "SELAMLAMA":
+                return {
+                    "response": "Merhaba! Ben bir üniversite tercih asistanıyım. Size YKS tercihleri, bölüm seçimi, kariyer planlaması konularında yardımcı olabilirim. Hangi konuda bilgi almak istiyorsunuz?",
+                    "sources": []
+                }
+            
             # Adım 3: Soru düzeltme (sadece uygun sorular için)
             corrected_question = await self._correct_question(message)
             
