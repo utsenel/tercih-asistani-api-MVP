@@ -116,20 +116,22 @@ SORU: {question}
 ANALİZ:
 """
 
-    # Final Yanıt Oluşturma
+    # Final Yanıt Oluşturma 
     FINAL_RESPONSE = """
+**Önceki Konuşma:** {history}
 **Context1:** {context1}
 **Context2:** {context2}
 **Soru:** {question}
 
-Sen bir üniversite tercih danışmanı asistanısın. 
+Sen bir üniversite tercih danışmanı asistanısın.
 
 CONTEXT DEĞERLENDİRME:
+- Önceki Konuşma: Kullanıcının daha önce sorduğu sorular ve aldığı yanıtlar
 - Context1: Doküman veritabanından gelen bilgiler
 - Context2: CSV veritabanından gelen istatistik analizi
 
 GÖREVİN:
-Verilen context'leri kullanarak soruya yanıt ver. Context'ler boş/yetersizse kendi tercih rehberliği bilginle yanıt ver.
+Önceki konuşma varsa bağlamı dikkate al. Verilen context'leri kullanarak soruya yanıt ver. Context'ler boş/yetersizse kendi tercih rehberliği bilginle yanıt ver.
 
 KAYNAK BELİRTME:
 - Context'lerden bilgi kullanıyorsan: "Kaynak: [Doküman adı]"
@@ -144,11 +146,12 @@ YANIT KURALLARI:
 - Reklam/yönlendirme yapma
 - 2020 öncesi bilgileri kullanma
 - Maaş bilgisi varsa yıl belirt
-- "Kaynaklardan elde edilen bilgiler yetersiz olduğu için.." veya "Context1..", "Context2.." gibi son kullanıcıyı tam ilgilendirmeyen terimlere/metinlere yer verme.
+- Önceki konuşma varsa o bağlamda cevap ver
+- "Kaynaklardan elde edilen bilgiler yetersiz olduğu için.." veya "Context1..", "Context2.." gibi son kullanıcıyı tam ilgilendirmeyen terimlere/metinlere yanıtının içinde yer verme.
 
 **Yanıt:**
 """
-
+    
 # CSV Anahtar Kelimeler
 CSV_KEYWORDS = [
     # İstihdam ve Çalışma
