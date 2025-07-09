@@ -172,7 +172,7 @@ class TercihAsistaniProcessor:
             final_response = await self._generate_final_response(
                 question=corrected_question,
                 context1=context1,
-                context2=context2
+                context2=context2,
                 history=conversation_history
             )
 
