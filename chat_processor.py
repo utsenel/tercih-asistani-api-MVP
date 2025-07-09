@@ -11,6 +11,7 @@ import json
 import asyncio
 import re
 from astrapy import DataAPIClient
+from langchain_openai import OpenAIEmbeddings
 #from astrapy.info import VectorServiceOptions
 
 # Config imports
@@ -87,17 +88,17 @@ class TercihAsistaniProcessor:
                 logger.info(f"Collection bulundu: {collection_name}")
     
                 try:
-                    vector_service_options = {
-                        "provider": "openai",
-                        "model_name": "text-embedding-3-small"
-                    }
-    
+                    embedding = OpenAIEmbeddings(
+                        model="text-embedding-3-small",
+                        openai_api_key=os.getenv("OPENAI_API_KEY")
+                    )
+
                     self.vectorstore = AstraDBVectorStore(
                         token=DatabaseSettings.ASTRA_DB_TOKEN,
                         api_endpoint=DatabaseSettings.ASTRA_DB_API_ENDPOINT,
                         collection_name=collection_name,
-                        embedding=None,
-                        collection_vector_service_options=vector_service_options
+                        embedding=embedding,
+                        # collection_vector_service_options parametresini kaldır
                     )
     
                     logger.info("✅ AstraDB VectorStore başarıyla oluşturuldu!")
