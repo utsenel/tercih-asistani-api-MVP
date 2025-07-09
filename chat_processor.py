@@ -11,6 +11,7 @@ import json
 import asyncio
 import re
 from astrapy import DataAPIClient
+from langchain_astradb import AstraVectorServiceOptions
 
 # Config imports
 from config import (
@@ -83,17 +84,21 @@ class TercihAsistaniProcessor:
                 
                 try:
                     # Ultra minimal - sadece zorunlu parametreler
+                    vector_service_options = AstraVectorServiceOptions(
+                        provider="openai",
+                        modelName="text-embedding-3-small"
+                    )
+                    
                     self.vectorstore = AstraDBVectorStore(
                         token=DatabaseSettings.ASTRA_DB_TOKEN,
                         api_endpoint=DatabaseSettings.ASTRA_DB_API_ENDPOINT,
-                        collection_name=collection_name,
-                        embedding=None,  # Astra Vectorize
-                        collection_vector_service_options={
-                        "provider": "openai",
-                        "modelName": "text-embedding-3-small"
-                        }
+                        collection_name="tercihrehberligi_pdf_collection",
+                        embedding=None,  # Astra kendi vektör servisini kullanır
+                        collection_vector_service_options=vector_service_options
                     )
                     logger.info("✅ AstraDB VectorStore başarıyla oluşturuldu!")
+
+
                     
                     # Test arama
                     test_docs = self.vectorstore.similarity_search("test", k=1)
