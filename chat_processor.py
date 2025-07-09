@@ -70,48 +70,50 @@ class TercihAsistaniProcessor:
     async def _initialize_astradb(self):
         """AstraDB bağlantısını başlat - Ultra minimal"""
         try:
-            
-            
-            # Collection'ları listele (debug için)
+            # ASYNC client
             client = DataAPIClient(token=DatabaseSettings.ASTRA_DB_TOKEN)
-            database = client.get_database_by_api_endpoint(DatabaseSettings.ASTRA_DB_API_ENDPOINT)
-            collections = list(database.list_collection_names())
+    
+            # ASYNC database handle al
+            async_database = client.get_async_database(DatabaseSettings.ASTRA_DB_API_ENDPOINT)
+    
+            # Koleksiyonları ASYNC listele
+            collections = await async_database.list_collection_names()
+    
             logger.info(f"Mevcut collection'lar: {collections}")
-            
+    
             collection_name = DatabaseSettings.ASTRA_DB_COLLECTION
+    
             if collection_name in collections:
                 logger.info(f"Collection bulundu: {collection_name}")
-                
+    
                 try:
-                    # Ultra minimal - sadece zorunlu parametreler
                     vector_service_options = AstraVectorServiceOptions(
                         provider="openai",
                         modelName="text-embedding-3-small"
                     )
-                    
+    
                     self.vectorstore = AstraDBVectorStore(
                         token=DatabaseSettings.ASTRA_DB_TOKEN,
                         api_endpoint=DatabaseSettings.ASTRA_DB_API_ENDPOINT,
-                        collection_name="tercihrehberligi_pdf_collection",
-                        embedding=None,  # Astra kendi vektör servisini kullanır
+                        collection_name=collection_name,
+                        embedding=None,
                         collection_vector_service_options=vector_service_options
                     )
+    
                     logger.info("✅ AstraDB VectorStore başarıyla oluşturuldu!")
-
-
-                    
-                    # Test arama
+    
+                    # Vector aramayı da ASYNC yapmak istersen
                     test_docs = self.vectorstore.similarity_search("test", k=1)
                     logger.info(f"✅ Test arama başarılı: {len(test_docs)} doküman bulundu")
-                    
+    
                 except Exception as vs_error:
                     logger.error(f"❌ AstraDBVectorStore oluşturma hatası: {vs_error}")
                     self.vectorstore = None
-                    
+    
             else:
                 logger.error(f"Collection '{collection_name}' bulunamadı!")
                 self.vectorstore = None
-                
+    
         except Exception as e:
             logger.error(f"AstraDB genel bağlantı hatası: {e}")
             self.vectorstore = None
