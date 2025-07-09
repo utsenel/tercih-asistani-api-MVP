@@ -32,6 +32,7 @@ KAPSAM DIŞI KONULAR:
 
 ÇIKTI SEÇENEKLERİ:
 - Soru uygunsa: "UYGUN"
+- Genel selamlaşma/karşılama ise: "SELAMLAMA"
 - Soru uygun değilse: "Uzmanlık dışı soru"
 
 ŞİMDİ GELEN SORUYU DEĞERLENDİR: {question}
