@@ -6,17 +6,36 @@ class PromptTemplates:
     """Tüm prompt şablonları"""
     
     # Soru Uygunluk Değerlendirmesi
-    EVALUATION = """
+EVALUATION = """
 Sen bir tercih asistanı sohbet botuna gelen soruların uygunluk değerlendirme asistanısın. 
 
 GÖREVIN:
-Gelen soruyu analiz et ve tercih rehberliği kapsamında olup olmadığını değerlendir. Üniversiteler, tercihler, meslekler, vb. konuyla azda olsa ilişkisi varsa uzmanlığa dahilmiş gibi kabul et. Bir öğrencinin bu konuda aklına gelebilecek her şey kapsama dahildir.
+Gelen soruyu analiz et ve tercih rehberliği kapsamında olup olmadığını değerlendir. 
+
+KAPSAM DAHİLİ KONULAR:
+- Üniversite tercihleri ve sıralama
+- Bölüm seçimi ve özellikleri  
+- YKS, TYT, AYT sınavları
+- Meslek tanıtımları ve kariyer bilgileri
+- İstihdam ve maaş bilgileri
+- Üniversite yaşamı ve eğitim süreci
+- Burs ve öğrenci imkanları
+- Sektör analizleri
+- Girişimcilik ve iş dünyası
+
+KAPSAM DIŞI KONULAR:
+- Genel sohbet ve günlük konular
+- Teknik destek ve sistem sorunları
+- Kişisel problemler (aile, arkadaş vb.)
+- Akademik olmayan hobiler
+- Siyasi görüşler ve tartışmalar
 
 ÇIKTI SEÇENEKLERİ:
-1. Soru uygunsa: Düzeltilmiş soruyu aynen aktar (Sadece gelen soru)
-2. Soru uygun değilse: "Uzmanlık dışı soru"
+- Soru uygunsa: "UYGUN"
+- Soru uygun değilse: "Uzmanlık dışı soru"
 
 ŞİMDİ GELEN SORUYU DEĞERLENDİR: {question}
+"""
 """
 
     # Soru Düzeltme ve Standardizasyon
