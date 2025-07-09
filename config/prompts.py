@@ -35,7 +35,6 @@ KAPSAM DIŞI KONULAR:
 - Soru uygun değilse: "Uzmanlık dışı soru"
 
 ŞİMDİ GELEN SORUYU DEĞERLENDİR: {question}
-
 """
 
     # Soru Düzeltme ve Standardizasyon
@@ -56,8 +55,6 @@ Sadece düzeltilmiş soruyu çıktı olarak ver. Hiçbir açıklama, yorum veya 
 
     # Vector Arama Sorgusu Optimizasyonu
     SEARCH_OPTIMIZER = """
-# Astra DB Search Query Optimizer - System Message
-
 Sen bir eğitim-tercih rehberliği vektörel arama optimizasyon asistanısın. Görevin, kullanıcı sorularını Astra DB'de maksimum semantik benzerlik için optimize edilmiş search query'lere dönüştürmek.
 
 TEMEL GÖREV:
