@@ -12,6 +12,7 @@ import asyncio
 import re
 from astrapy import DataAPIClient
 from langchain_openai import OpenAIEmbeddings
+from memory import ConversationMemory
 #from astrapy.info import VectorServiceOptions
 
 # Config imports
@@ -36,6 +37,7 @@ class TercihAsistaniProcessor:
         self.llm_final = None
         self.vectorstore = None
         self.csv_data = None
+        self.memory = ConversationMemory() 
         
         # Config'lerden prompt'ları al
         self.evaluation_prompt = ChatPromptTemplate.from_template(PromptTemplates.EVALUATION)
@@ -165,11 +167,17 @@ class TercihAsistaniProcessor:
             )
             
             # Adım 5: Final yanıt oluşturma
+            conversation_history = self.memory.get_history(session_id)
+            
             final_response = await self._generate_final_response(
                 question=corrected_question,
                 context1=context1,
                 context2=context2
+                history=conversation_history
             )
+
+            self.memory.add_message(session_id, "user", message)
+            self.memory.add_message(session_id, "assistant", final_response)
             
             return {
                 "response": final_response,
@@ -359,7 +367,7 @@ class TercihAsistaniProcessor:
 
 
 
-    async def _generate_final_response(self, question: str, context1: str, context2: str) -> str:
+    async def _generate_final_response(self, question: str, context1: str, context2: str , history: str = "") -> str:
         """Final yanıtı oluştur"""
         try:
             logger.info(f"Final yanıt oluşturuluyor - Context1: {len(context1)}, Context2: {len(context2)}")
