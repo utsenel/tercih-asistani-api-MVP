@@ -106,7 +106,7 @@ GÖREV:
 3. Karşılaştırmalı analiz (mümkünse)
 4. Yanıtta "2024 Cumhurbaşkanlığı Uni-Veri" kaynağını belirt
 
-Veri yoksa: "Bu bölüm Cumhurbaşkanlığı Uni-Veri veritabanında bulunmamaktadır"
+Eğer CSV'de ilgili veri yoksa: 'Bu konu içinCumhurbaşkanlığı Uni-Veri veritabanında bilgi  bulunmamaktadır.' şeklinde yanıt ver (tek cümle).
 
 CSV: {csv_data}
 SORU: {question}
