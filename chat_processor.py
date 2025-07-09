@@ -9,6 +9,7 @@ from langchain_core.prompts import ChatPromptTemplate
 import math
 import json
 import asyncio
+import re
 
 # Config imports
 from config import (
@@ -241,55 +242,93 @@ class TercihAsistaniProcessor:
 
 
 
+ 
+
     async def _get_csv_context(self, question: str) -> str:
-        """CSV verilerini paralel chunk'larla LLM'e gönder"""
+        """Akıllı CSV analiz - bölüm, yıl ve metrik filtreleme"""
         try:
             if self.csv_data is None:
-                logger.warning("CSV yok")
-                return "CSV verisi yok"
+                return "CSV verileri mevcut değil"
     
             question_lower = question.lower()
-            has_csv_keyword = any(keyword.lower() in question_lower for keyword in CSV_KEYWORDS)
-            has_numbers = bool(re.search(r'\d+', question))
     
-            if not has_csv_keyword and not has_numbers:
-                return "Bu soru için CSV verisi gerekli değil"
+            # Bölüm adını bul
+            bolum_adi = None
+            for bolum in self.csv_data['bolum_adi'].unique():
+                if bolum.lower() in question_lower:
+                    bolum_adi = bolum
+                    break
     
-            logger.info(f"CSV paralel chunk analiz başlıyor: {question}")
+            # Gösterge ID / yıl
+            gosterge_id = None
+            match = re.search(r'\b20\d{2}\b', question)
+            if match:
+                gosterge_id = int(match.group(0))
     
-            csv_records = self.csv_data.to_dict(orient="records")
-            chunk_size = 20
-            num_chunks = math.ceil(len(csv_records) / chunk_size)
+            # Metrik çıkarımı
+            metrik_map = {
+                "istihdam": [
+                    "istihdam_orani",
+                    "akademik_istihdam_orani",
+                    "yonetici_pozisyonu_istihdam_orani"
+                ],
+                "maaş": [col for col in self.csv_data.columns if col.startswith("maas_")],
+                "firma": [col for col in self.csv_data.columns if col.startswith("firma_")],
+                "girişim": ["girisimcilik_orani", "katma_degerli_girisim_endeksi"] + 
+                           [col for col in self.csv_data.columns if col.startswith("girisim_omru_")],
+                "sektör": [col for col in self.csv_data.columns if col.startswith("sektor_")]
+            }
     
-            logger.info(f"Toplam satır: {len(csv_records)}, Chunk sayısı: {num_chunks}")
+            metrikler = []
+            for anahtar, cols in metrik_map.items():
+                if anahtar in question_lower:
+                    metrikler.extend(cols)
     
-            # Her chunk için görev oluştur
-            tasks = []
-            for i in range(num_chunks):
-                chunk = csv_records[i * chunk_size : (i + 1) * chunk_size]
-                chunk_json = json.dumps(chunk, ensure_ascii=False)[:8000]
+            if not metrikler:
+                # Hiç anahtar eşleşmezse default: tüm metrikler
+                metrikler = [col for col in self.csv_data.columns if col not in ['bolum_adi', 'gosterge_id', 'bolum_id']]
     
-                task = self.llm_csv_agent.ainvoke(
-                    self.csv_agent_prompt.format(
-                        question=question,
-                        csv_data=chunk_json
-                    )
+            # Filtre oluştur
+            criteria = []
+            if bolum_adi:
+                criteria.append(self.csv_data['bolum_adi'] == bolum_adi)
+            if gosterge_id:
+                criteria.append(self.csv_data['gosterge_id'] == gosterge_id)
+    
+            if criteria:
+                mask = criteria[0]
+                for cond in criteria[1:]:
+                    mask &= cond
+                filtered = self.csv_data[mask]
+            else:
+                filtered = self.csv_data
+    
+            if filtered.empty:
+                logger.warning("Filtre sonucunda veri bulunamadı. Örnek veri gönderiliyor.")
+                filtered = self.csv_data.head(CSVConfig.SAMPLE_ROWS)
+    
+            selected_cols = ['bolum_adi', 'gosterge_id'] + metrikler
+            selected = filtered[selected_cols]
+    
+            logger.info(f"Filtreli CSV veri: {selected.shape} - Bölüm: {bolum_adi} - Yıl: {gosterge_id}")
+    
+            csv_snippet = selected.to_string(index=False)
+    
+            result = await self.llm_csv_agent.ainvoke(
+                self.csv_agent_prompt.format(
+                    question=question,
+                    csv_data=csv_snippet
                 )
-                tasks.append(task)
+            )
     
-            # Tüm chunk görevlerini paralel çalıştır
-            results = await asyncio.gather(*tasks)
-    
-            # Sonuçları birleştir
-            partial_analyses = [result.content.strip() for result in results]
-            combined = "\n\n".join(partial_analyses)
-    
-            logger.info(f"Tüm CSV analiz tamam: {len(combined)} karakter")
-            return combined
+            analysis = result.content.strip()
+            logger.info(f"Akıllı CSV analiz sonucu: {analysis[:200]}...")
+            return analysis
     
         except Exception as e:
-            logger.error(f"Paralel chunk analiz hatası: {e}")
-            return "CSV analizinde paralel chunklama hatası oluştu"
+            logger.error(f"Akıllı CSV analiz hatası: {e}")
+            return "CSV analizi sırasında hata oluştu"
+
 
 
     async def _generate_final_response(self, question: str, context1: str, context2: str) -> str:
