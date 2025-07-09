@@ -143,13 +143,13 @@ class TercihAsistaniProcessor:
             evaluation_result = await self._evaluate_question(message)
             
             # Adım 2: Koşullu yönlendirme
-            if evaluation_result.strip() == "Uzmanlık dışı soru":
+            if evaluation_result == "Uzmanlık dışı soru":
                 return {
                     "response": MessageSettings.ERROR_EXPERTISE_OUT,
                     "sources": []
                 }
             
-            # Adım 3: Soru düzeltme
+            # Adım 3: Soru düzeltme (sadece uygun sorular için)
             corrected_question = await self._correct_question(message)
             
             # Adım 4: Paralel işlemler
@@ -184,11 +184,19 @@ class TercihAsistaniProcessor:
             result = await self.llm_evaluation.ainvoke(
                 self.evaluation_prompt.format(question=question)
             )
-            logger.info(f"Soru değerlendirme sonucu: {result.content.strip()}")
-            return result.content.strip()
+            evaluation_result = result.content.strip()
+            logger.info(f"Soru değerlendirme sonucu: {evaluation_result}")
+            
+            # Evaluation sonucunu kontrol et
+            if "UYGUN" in evaluation_result.upper():
+                return "UYGUN"
+            else:
+                return "Uzmanlık dışı soru"
+                
         except Exception as e:
             logger.error(f"Değerlendirme hatası: {e}")
-            return question  # Hata durumunda soruyu olduğu gibi geçir
+            # Hata durumunda güvenli tarafta kal - soruyu uygun kabul et
+            return "UYGUN"
 
     async def _correct_question(self, question: str) -> str:
         """Soru düzeltme ve standardizasyon"""
