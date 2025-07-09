@@ -90,6 +90,7 @@ class TercihAsistaniProcessor:
                 try:
                     embedding = OpenAIEmbeddings(
                         model="text-embedding-3-small",
+                        dimensions=512,  # 512 boyuta ayarla
                         openai_api_key=os.getenv("OPENAI_API_KEY")
                     )
 
