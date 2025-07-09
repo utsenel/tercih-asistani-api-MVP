@@ -58,7 +58,7 @@ class LLMConfigs:
     
     # CSV agent - Analitik düşünme
     CSV_AGENT = LLMConfig(
-        model="gpt-4-turbo-preview",
+        model="gpt-4o",
         temperature=0.3,
         max_tokens=600,
         max_retries=3,
