@@ -87,7 +87,11 @@ class TercihAsistaniProcessor:
                         token=DatabaseSettings.ASTRA_DB_TOKEN,
                         api_endpoint=DatabaseSettings.ASTRA_DB_API_ENDPOINT,
                         collection_name=collection_name,
-                        embedding=None  # Astra Vectorize
+                        embedding=None  # Astra Vectorize,
+                        collection_vector_service_options={
+                        "provider": "openai",
+                        "modelName": "text-embedding-3-small"
+                        }
                     )
                     logger.info("✅ AstraDB VectorStore başarıyla oluşturuldu!")
                     
