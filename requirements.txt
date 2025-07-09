@@ -10,3 +10,4 @@ pydantic==2.5.0
 aiofiles==23.2.1
 httpx==0.25.2
 astrapy==1.2.0
+redis==5.0.1
