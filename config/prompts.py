@@ -107,7 +107,9 @@ GÖREV:
 3. Karşılaştırmalı analiz (mümkünse)
 4. Yanıtta "2024 Cumhurbaşkanlığı Uni-Veri" kaynağını belirt
 
-Eğer CSV'de ilgili veri yoksa: 'Bu konu içinCumhurbaşkanlığı Uni-Veri veritabanında bilgi  bulunmamaktadır.' şeklinde yanıt ver (tek cümle).
+YANIT KURALLARI:
+- Veri varsa: Maksimum 4-5 cümle analiz
+- Veri yoksa: "Bu konu için Cumhurbaşkanlığı Uni-Veri veritabanında bilgi bulunmamaktadır."
 
 CSV: {csv_data}
 SORU: {question}
