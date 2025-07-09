@@ -185,7 +185,6 @@ class TercihAsistaniProcessor:
             }
 
     async def _evaluate_question(self, question: str) -> str:
-        """Soru uygunluk değerlendirmesi"""
         try:
             result = await self.llm_evaluation.ainvoke(
                 self.evaluation_prompt.format(question=question)
@@ -193,15 +192,16 @@ class TercihAsistaniProcessor:
             evaluation_result = result.content.strip()
             logger.info(f"Soru değerlendirme sonucu: {evaluation_result}")
             
-            # Evaluation sonucunu kontrol et
-            if "UYGUN" in evaluation_result.upper():
+            # SELAMLAMA kontrolü ekle
+            if "SELAMLAMA" in evaluation_result.upper():
+                return "SELAMLAMA"
+            elif "UYGUN" in evaluation_result.upper():
                 return "UYGUN"
             else:
                 return "Uzmanlık dışı soru"
                 
         except Exception as e:
             logger.error(f"Değerlendirme hatası: {e}")
-            # Hata durumunda güvenli tarafta kal - soruyu uygun kabul et
             return "UYGUN"
 
     async def _correct_question(self, question: str) -> str:
