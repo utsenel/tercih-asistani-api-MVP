@@ -159,11 +159,10 @@ class TercihAsistaniProcessor:
             corrected_question = await self._correct_question(message)
             
             # Adım 4: Paralel işlemler
-            # 4a: Vector arama
-            context1 = await self._get_vector_context(corrected_question)
-            
-            # 4b: CSV analizi
-            context2 = await self._get_csv_context(corrected_question)
+            context1, context2 = await asyncio.gather(
+                self._get_vector_context(corrected_question),
+                self._get_csv_context(corrected_question)
+            )
             
             # Adım 5: Final yanıt oluşturma
             final_response = await self._generate_final_response(
