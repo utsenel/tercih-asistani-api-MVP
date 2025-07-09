@@ -376,7 +376,8 @@ class TercihAsistaniProcessor:
                 self.final_prompt.format(
                     question=question,
                     context1=context1,
-                    context2=context2
+                    context2=context2,
+                    history=history
                 )
             )
             
