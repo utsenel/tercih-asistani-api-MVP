@@ -176,6 +176,7 @@ YANIT KURALLARI:
 - Reklam/yönlendirme yapma
 - 2020 öncesi bilgileri kullanma
 - Maaş bilgisi varsa yıl belirt
+- "Kaynaklardan elde edilen bilgiler yetersiz olduğu için.." veya "Context1..", "Context2.." gibi son kullanıcıyı tam ilgilendirmeyen terimlere/metinlere yer verme.
 
 **Yanıt:**
 """
