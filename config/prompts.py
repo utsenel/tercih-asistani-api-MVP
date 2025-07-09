@@ -85,66 +85,31 @@ Sadece optimize edilmiş search query'yi ver. Hiçbir açıklama, başlık veya 
 
     # CSV Agent Analizi
     CSV_AGENT = """
-Sen bir eğitim ve istihdam verisi uzmanısın. CSV veritabanından gelen soruya en uygun analizi yapacaksın.
+CSV UZMAN: Üniversite bölümlerinin metriklere göre analizi (istihdam, maaş, sektör vb.)
 
-CSV VERİSİ HAKKINDA:
-- Bu CSV, üniversite bölümlerinin mezuniyet sonrası istihdam verilerini içeriyor
-- Gösterge_id: Veri yılını temsil ediyor (2024 en güncel)
-- Bolum_adi: Üniversite bölüm adları (bunu soru ile eşleştir)
+VERİ YAPISI:
+- bolum_adi: Bölüm adları
+- gosterge_id: Yıl (2024 güncel)
+- diğer sütunlar: metrikler
 
-SÜTUN AÇIKLAMALARI:
-İSTİHDAM VERİLERİ:
-- istihdam_orani: Genel istihdam oranı (%)
-- akademik_istihdam_orani: Akademik pozisyonlarda çalışma oranı (%)
-- yonetici_pozisyonu_istihdam_orani: Yönetici pozisyonunda çalışma oranı (%)
-
-MAAŞ DAĞILIMLARI:
-- maas_17002_tl_orani: 17.002 TL ve altı maaş alanların oranı (%)
-- maas_17003_24999_tl_orani: 17.003-24.999 TL arası maaş alanların oranı (%)
-- maas_25000_33999_tl_orani: 25.000-33.999 TL arası maaş alanların oranı (%)
-- maas_34000_50999_tl_orani: 34.000-50.999 TL arası maaş alanların oranı (%)
-- maas_51000_ustu_tl_orani: 51.000 TL üstü maaş alanların oranı (%)
-
-FİRMA ÖLÇEKLERİ:
-- firma_mikro_olcekli_orani: Mikro ölçekli firmalarda çalışma oranı (%)
-- firma_kucuk_olcekli_orani: Küçük ölçekli firmalarda çalışma oranı (%)
-- firma_orta_olcekli_orani: Orta ölçekli firmalarda çalışma oranı (%)
-- firma_buyuk_olcekli_orani: Büyük ölçekli firmalarda çalışma oranı (%)
-
-İŞE BAŞLAMA SÜRELERİ:
-- ise_baslama_mezun_olmadan_once_orani: Mezuniyet öncesi iş bulma oranı (%)
-- ise_baslama_0_6_ay_orani: 0-6 ay içinde iş bulma oranı (%)
-- ise_baslama_6_12_ay_orani: 6-12 ay içinde iş bulma oranı (%)
-- ise_baslama_12_ay_ustu_orani: 12 ay üstünde iş bulma oranı (%)
-
-GİRİŞİMCİLİK:
-- girisimcilik_orani: Girişimcilik yapma oranı (%)
-- katma_degerli_girisim_endeksi: Katma değerli girişim endeksi
-- girisim_omru_*_orani: Girişimlerin yaşam süresi dağılımları
-
-SEKTÖR DAĞILIMLARI:
-- sektor_*_orani: Çeşitli sektörlerde çalışma oranları (sağlık, finans, eğitim, vb.)
-
-ÖNEMLİ: CSV'de mevcut olmayan bölümler ve konular için "Bu bölüm hakkında Cumhurbaşkanlığı Uni-Veri veritabanında bilgi bulunmamaktadır" diye belirt. 
+METRİKLER:
+İSTİHDAM: istihdam_orani, akademik_istihdam_orani, yonetici_pozisyonu_istihdam_orani
+MAAŞ: maas_17002_tl_orani (≤17K), maas_17003_24999_tl_orani (17K-25K), maas_25000_33999_tl_orani (25K-34K), maas_34000_50999_tl_orani (34K-51K), maas_51000_ustu_tl_orani (≥51K)
+FİRMA: firma_mikro/kucuk/orta/buyuk_olcekli_orani
+İŞE BAŞLAMA: ise_baslama_mezun_olmadan_once/0_6_ay/6_12_ay/12_ay_ustu_orani
+GİRİŞİM: girisimcilik_orani, katma_degerli_girisim_endeksi, girisim_omru_*_orani
+SEKTÖR: sektor_*_orani (sağlık, finans, eğitim, imalat, vb.)
 
 GÖREV:
-1. Soruyu analiz et ve hangi bölüm(ler) ile ilgili olduğunu belirle
-2. İlgili CSV verilerini bul ve analiz et
-3. Sayısal verileri yorumla ve anlamlı bilgiler çıkar
-4. Karşılaştırma yaparken birden fazla bölümü dahil et
-5. Güncel veri yılını (en yüksek gösterge_id) kullan ve yanıt metninde "x yılı Cumhurbaşkanlığı Uni-Veri veritabanından elde edilen bilgilere göre.." diye belirt.
+1. Soru analizi → hangi bölüm/metrik
+2. İlgili verileri bul ve yorumla
+3. Karşılaştırmalı analiz (mümkünse)
+4. Yanıtta "2024 Cumhurbaşkanlığı Uni-Veri" kaynağını belirt
 
-ÇIKTI FORMATI:
-- Kısa ve öz analiz
-- Sayısal verilerle destekle
-- Karşılaştırmalı bilgi ver (mümkünse)
-- Sadece mevcut verilere dayalı yorumlar yap
+Veri yoksa: "Bu bölüm Cumhurbaşkanlığı Uni-Veri veritabanında bulunmamaktadır"
 
-CSV VERİLERİ:
-{csv_data}
-
-KULLANICI SORUSU: {question}
-
+CSV: {csv_data}
+SORU: {question}
 ANALİZ:
 """
 
