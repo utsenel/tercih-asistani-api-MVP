@@ -10,6 +10,7 @@ import math
 import json
 import asyncio
 import re
+from astrapy import DataAPIClient
 
 # Config imports
 from config import (
@@ -66,9 +67,9 @@ class TercihAsistaniProcessor:
             raise
 
     async def _initialize_astradb(self):
-        """AstraDB bağlantısını başlat"""
+        """AstraDB bağlantısını başlat - Ultra minimal"""
         try:
-            from astrapy import DataAPIClient
+            
             
             # Collection'ları listele (debug için)
             client = DataAPIClient(token=DatabaseSettings.ASTRA_DB_TOKEN)
@@ -78,31 +79,32 @@ class TercihAsistaniProcessor:
             
             collection_name = DatabaseSettings.ASTRA_DB_COLLECTION
             if collection_name in collections:
-                logger.info(f"Mevcut collection kullanılıyor: {collection_name}")
-
-                # autodetect değişkenini tanımla
-                #autodetect = collection_name in collections
+                logger.info(f"Collection bulundu: {collection_name}")
                 
-                # Minimal AstraDBVectorStore
-                self.vectorstore = AstraDBVectorStore(
-                    token=DatabaseSettings.ASTRA_DB_TOKEN,
-                    api_endpoint=DatabaseSettings.ASTRA_DB_API_ENDPOINT,
-                    collection_name=collection_name,
-                    embedding=None,  # Astra Vectorize
-                    collection_vector_service_options={
-                        "provider": "OpenAI",
-                        "model": "text-embedding-3-large"
-                    },
-                    #autodetect_collection=autodetect,
-                    #ignore_invalid_documents=True,
-                )
-                logger.info("AstraDB bağlantısı başarılı!")
+                try:
+                    # Ultra minimal - sadece zorunlu parametreler
+                    self.vectorstore = AstraDBVectorStore(
+                        token=DatabaseSettings.ASTRA_DB_TOKEN,
+                        api_endpoint=DatabaseSettings.ASTRA_DB_API_ENDPOINT,
+                        collection_name=collection_name,
+                        embedding=None  # Astra Vectorize
+                    )
+                    logger.info("✅ AstraDB VectorStore başarıyla oluşturuldu!")
+                    
+                    # Test arama
+                    test_docs = self.vectorstore.similarity_search("test", k=1)
+                    logger.info(f"✅ Test arama başarılı: {len(test_docs)} doküman bulundu")
+                    
+                except Exception as vs_error:
+                    logger.error(f"❌ AstraDBVectorStore oluşturma hatası: {vs_error}")
+                    self.vectorstore = None
+                    
             else:
                 logger.error(f"Collection '{collection_name}' bulunamadı!")
                 self.vectorstore = None
                 
         except Exception as e:
-            logger.error(f"AstraDB bağlantı hatası: {e}")
+            logger.error(f"AstraDB genel bağlantı hatası: {e}")
             self.vectorstore = None
     
     async def _initialize_csv(self):
