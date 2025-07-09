@@ -35,7 +35,7 @@ KAPSAM DIŞI KONULAR:
 - Soru uygun değilse: "Uzmanlık dışı soru"
 
 ŞİMDİ GELEN SORUYU DEĞERLENDİR: {question}
-"""
+
 """
 
     # Soru Düzeltme ve Standardizasyon
