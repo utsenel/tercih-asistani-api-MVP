@@ -11,7 +11,7 @@ import json
 import asyncio
 import re
 from astrapy import DataAPIClient
-from langchain_astradb import AstraVectorServiceOptions
+from astrapy.info import VectorServiceOptions
 
 # Config imports
 from config import (
@@ -87,9 +87,9 @@ class TercihAsistaniProcessor:
                 logger.info(f"Collection bulundu: {collection_name}")
     
                 try:
-                    vector_service_options = AstraVectorServiceOptions(
+                    vector_service_options = VectorServiceOptions(
                         provider="openai",
-                        modelName="text-embedding-3-small"
+                        model_name="text-embedding-3-small"
                     )
     
                     self.vectorstore = AstraDBVectorStore(
