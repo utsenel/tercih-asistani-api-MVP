@@ -5,7 +5,6 @@ from pydantic import BaseModel
 import os
 from dotenv import load_dotenv
 import logging
-import time
 
 # Local imports
 from chat_processor import TercihAsistaniProcessor
@@ -106,29 +105,28 @@ async def health_check():
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat_endpoint(request: Request, chat_request: ChatRequest): 
-
+    import time
     start_time = time.time()
     
     try:
-        logger.info(f"📥 Frontend'den gelen session_id: '{request.session_id}'")
+        logger.info(f"📥 Frontend'den gelen session_id: '{chat_request.session_id}'")
         logger.info(f"🌐 Request origin bilgileri kontrol ediliyor...")
-        logger.info(f"Gelen mesaj: {request.message[:100]}...")
-
+        
         # Client IP'yi al
         client_ip = request.client.host
-
+        
         # Frontend "ng" gönderiyorsa IP-based session oluştur
         if not chat_request.session_id or chat_request.session_id in ["ng", "default", ""]:
             ip_hash = hashlib.md5(client_ip.encode()).hexdigest()[:8]
             chat_request.session_id = f"ip_{ip_hash}"
-        logger.info(f"🔄 IP-based session oluşturuldu: '{chat_request.session_id}' (IP: {client_ip})")
+            logger.info(f"🔄 IP-based session oluşturuldu: '{chat_request.session_id}' (IP: {client_ip})")
         
         logger.info(f"Gelen mesaj: {chat_request.message[:100]}...")
         
         # Chat processor ile işle
         result = await processor.process_message(
-            message=request.message,
-            session_id=request.session_id
+            message=chat_request.message,
+            session_id=chat_request.session_id
         )
         
         # Processing time hesapla
@@ -140,8 +138,8 @@ async def chat_endpoint(request: Request, chat_request: ChatRequest):
             sources=result.get("sources", []),
             metadata={
                 "processing_time": processing_time,
-                "session_id": request.session_id,
-                "message_length": len(request.message)
+                "session_id": chat_request.session_id,
+                "message_length": len(chat_request.message)
             }
         )
         
