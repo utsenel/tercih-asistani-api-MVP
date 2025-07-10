@@ -141,6 +141,9 @@ class TercihAsistaniProcessor:
         Ana mesaj işleme akışı - Langflow'daki akışınızın aynısı
         """
         try:
+            # chat_processor.py'de debug ekle:
+            logger.info(f"🔍 RAW Session ID: '{session_id}' - Type: {type(session_id)} - Length: {len(session_id)}")
+            
             # Adım 1: Soru uygunluk değerlendirmesi
             evaluation_result = await self._evaluate_question(message)
             
