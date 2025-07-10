@@ -111,6 +111,8 @@ async def chat_endpoint(request: ChatRequest):
     start_time = time.time()
     
     try:
+        logger.info(f"📥 Frontend'den gelen session_id: '{request.session_id}'")
+        logger.info(f"🌐 Request origin bilgileri kontrol ediliyor...")
         logger.info(f"Gelen mesaj: {request.message[:100]}...")
         
         # Chat processor ile işle
