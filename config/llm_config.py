@@ -107,6 +107,37 @@ class VectorConfig:
     SEARCH_TYPE = "similarity"
     SCORE_THRESHOLD = 0.7
 
+
+# Performance Monitoring
+class PerformanceConfig:
+    """Performans izleme ayarları"""
+    ENABLE_METRICS = True
+    LOG_RESPONSE_TIMES = True
+    LOG_TOKEN_USAGE = True
+    LOG_PROVIDER_DISTRIBUTION = True
+    
+    # Response time thresholds (saniye)
+    WARNING_THRESHOLD = 5.0
+    ERROR_THRESHOLD = 15.0
+    
+    # Token usage tracking
+    TRACK_DAILY_USAGE = True
+    DAILY_TOKEN_LIMIT = 1000000
+
+# Fallback Strategy
+class FallbackConfig:
+    """Fallback stratejileri"""
+    ENABLE_FALLBACK = True
+    
+    # Gemini fail olursa OpenAI'a fallback
+    GEMINI_TO_OPENAI_FALLBACK = {
+        "gemini-1.5-flash": "gpt-4o-mini",
+        "gemini-1.5-pro": "gpt-4o"
+    }
+    
+    # Retry stratejisi
+    MAX_FALLBACK_ATTEMPTS = 2
+    FALLBACK_DELAY = 1.0
 # CSV Analiz Ayarları  
 class CSVConfig:
     """CSV analiz konfigürasyonları"""
