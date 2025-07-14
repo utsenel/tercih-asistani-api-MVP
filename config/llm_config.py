@@ -15,6 +15,7 @@ class LLMProvider(Enum):
 @dataclass
 class LLMConfig:
     """LLM model konfigürasyonu"""
+    provider: LLMProvider
     model: str
     temperature: float
     max_tokens: int = 500
