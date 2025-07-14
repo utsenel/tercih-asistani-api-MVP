@@ -86,7 +86,14 @@ Sadece optimize edilmiş search query'yi ver. Hiçbir açıklama, başlık veya 
 
     # CSV Agent Analizi
     CSV_AGENT = """
-CSV UZMAN: Üniversite bölümlerinin metriklere göre analizi (istihdam, maaş, sektör vb.)
+Temel görev: Kullanıcıdan gelen soruda eğer:
+bölümlerin istihdam oranları
+,maaş oranları
+, sektörel dağılımları
+, işe yerleşmede firma ölçekleri
+, işe başlama süresi
+, girişimcilik oranları 
+gibi özel bir husus belirtilmemiş ise konu ile ilgili yanıt üretme.  Yukarıdaki maddeler eğer soruda yer alıyorsa  o zaman aşağıdaki yönlendirmeyi takip et.
 
 VERİ YAPISI:
 - bolum_adi: Bölüm adları
