@@ -44,9 +44,9 @@ class LLMConfigs:
     
     EVALUATION = LLMConfig(LLMProvider.GOOGLE, "gemini-1.5-flash", 0.3, 50, timeout=30)
     CORRECTION = LLMConfig(LLMProvider.GOOGLE, "gemini-1.5-flash", 0.1, 150, timeout=30)
-    SEARCH_OPTIMIZER = LLMConfig(LLMProvider.GOOGLE, "gemini-1.5-pro", 0.3, 150, timeout=60)
-    CSV_AGENT = LLMConfig(LLMProvider.GOOGLE, "gemini-1.5-pro", 0.3, 600, timeout=100)
-    FINAL_RESPONSE = LLMConfig(LLMProvider.GOOGLE, "gemini-1.5-pro", 0.3, 500, timeout=120)
+    SEARCH_OPTIMIZER = LLMConfig(LLMProvider.GOOGLE, "gemini-1.5-flash", 0.3, 150, timeout=60)
+    CSV_AGENT = LLMConfig(LLMProvider.GOOGLE, "gemini-1.5-flash", 0.3, 600, timeout=100)
+    FINAL_RESPONSE = LLMConfig(LLMProvider.GOOGLE, "gemini-1.5-flash", 0.3, 500, timeout=120)
 
 # chat_processor.py için factory
 class LLMFactory:
