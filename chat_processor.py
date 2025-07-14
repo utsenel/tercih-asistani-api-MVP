@@ -17,7 +17,7 @@ from memory import ConversationMemory
 
 # Config imports
 from config import (
-    LLMConfigs, VectorConfig, CSVConfig,
+    LLMConfigs, LLMProvider, VectorConfig, CSVConfig,
     PromptTemplates, CSV_KEYWORDS,
     DatabaseSettings, MessageSettings
 )
