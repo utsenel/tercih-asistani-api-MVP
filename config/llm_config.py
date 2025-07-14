@@ -4,6 +4,13 @@ LLM Konfigürasyonları - Tüm model ayarları burada
 import os
 from dataclasses import dataclass
 from typing import Dict, Any
+from enum import Enum
+
+# YENİ: Provider enum'u ekleyin
+class LLMProvider(Enum):
+    """LLM sağlayıcı türleri"""
+    OPENAI = "openai"
+    GOOGLE = "google"
 
 @dataclass
 class LLMConfig:
@@ -14,16 +21,29 @@ class LLMConfig:
     max_retries: int = 3
     timeout: int = 100
     
-    def to_dict(self) -> Dict[str, Any]:
-        """OpenAI parametrelerine dönüştür"""
-        return {
-            "api_key": os.getenv("OPENAI_API_KEY"),
-            "model": self.model,
-            "temperature": self.temperature,
-            "max_tokens": self.max_tokens,
-            "max_retries": self.max_retries,
-            "timeout": self.timeout
-        }
+    def to_langchain_params(self) -> Dict[str, Any]:
+        """Provider'a göre LangChain parametrelerini döndür"""
+        if self.provider == LLMProvider.OPENAI:
+            return {
+                "api_key": os.getenv("OPENAI_API_KEY"),
+                "model": self.model,
+                "temperature": self.temperature,
+                "max_tokens": self.max_tokens,
+                "max_retries": self.max_retries,
+                "timeout": self.timeout
+            }
+        elif self.provider == LLMProvider.GOOGLE:
+            return {
+                "google_api_key": os.getenv("GOOGLE_API_KEY"),
+                "model": self.model,
+                "temperature": self.temperature,
+                "max_output_tokens": self.max_tokens,  # Gemini için farklı parametre adı
+                "max_retries": self.max_retries,
+                "timeout": self.timeout
+            }
+        else:
+            raise ValueError(f"Desteklenmeyen provider: {self.provider}")
+
 
 # LLM Model Konfigürasyonları
 class LLMConfigs:
@@ -31,8 +51,9 @@ class LLMConfigs:
     
     # Soru uygunluk değerlendirmesi - Daha karmaşık karar verme
     EVALUATION = LLMConfig(
-        model="gpt-4o",
-        temperature=0.5,
+        provider=LLMProvider.GOOGLE,
+        model="gemini-1.5-flash",
+        temperature=0.3,
         max_tokens=100,
         max_retries=3,
         timeout=60
@@ -40,7 +61,8 @@ class LLMConfigs:
     
     # Soru düzeltme - Deterministik olmalı
     CORRECTION = LLMConfig(
-        model="gpt-4o",
+        provider=LLMProvider.GOOGLE,
+        model="gemini-1.5-flash",
         temperature=0.1,
         max_tokens=200,
         max_retries=3,
@@ -49,6 +71,7 @@ class LLMConfigs:
     
     # Arama sorgusu optimizasyonu - Yaratıcı olabilir
     SEARCH_OPTIMIZER = LLMConfig(
+        provider=LLMProvider.OPENAI,
         model="gpt-4o",
         temperature=0.3,
         max_tokens=150,
@@ -58,6 +81,7 @@ class LLMConfigs:
     
     # CSV agent - Analitik düşünme
     CSV_AGENT = LLMConfig(
+        provider=LLMProvider.OPENAI,
         model="gpt-4o",
         temperature=0.3,
         max_tokens=600,
@@ -67,6 +91,7 @@ class LLMConfigs:
     
     # Final yanıt - En önemli, kaliteli olmalı
     FINAL_RESPONSE = LLMConfig(
+        provider=LLMProvider.OPENAI,
         model="gpt-4o",
         temperature=0.3,
         max_tokens=500,
