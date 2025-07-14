@@ -24,6 +24,18 @@ from config import (
 
 logger = logging.getLogger(__name__)
 
+class LLMFactory:
+    @staticmethod
+    def create_llm(config):
+        params = config.to_langchain_params()
+        
+        if config.provider == LLMProvider.OPENAI:
+            from langchain_openai import ChatOpenAI
+            return ChatOpenAI(**params)
+        elif config.provider == LLMProvider.GOOGLE:
+            from langchain_google_genai import ChatGoogleGenerativeAI
+            return ChatGoogleGenerativeAI(**params)
+
 class TercihAsistaniProcessor:
     """
     Langflow akışınızı taklit eden ana processor - Config'lerle güncellenmiş
@@ -49,12 +61,12 @@ class TercihAsistaniProcessor:
     async def initialize(self):
         """Tüm bileşenleri başlat - Config'lerle"""
         try:
-            # OpenAI modellerini config'lerden başlat
-            self.llm_evaluation = ChatOpenAI(**LLMConfigs.EVALUATION.to_dict())
-            self.llm_correction = ChatOpenAI(**LLMConfigs.CORRECTION.to_dict())
-            self.llm_search_optimizer = ChatOpenAI(**LLMConfigs.SEARCH_OPTIMIZER.to_dict())
-            self.llm_csv_agent = ChatOpenAI(**LLMConfigs.CSV_AGENT.to_dict())
-            self.llm_final = ChatOpenAI(**LLMConfigs.FINAL_RESPONSE.to_dict())
+            # Multi-provider LLM'leri başlat
+            self.llm_evaluation = LLMFactory.create_llm(LLMConfigs.EVALUATION)
+            self.llm_correction = LLMFactory.create_llm(LLMConfigs.CORRECTION)
+            self.llm_search_optimizer = LLMFactory.create_llm(LLMConfigs.SEARCH_OPTIMIZER)
+            self.llm_csv_agent = LLMFactory.create_llm(LLMConfigs.CSV_AGENT)
+            self.llm_final = LLMFactory.create_llm(LLMConfigs.FINAL_RESPONSE)
             
             logger.info("LLM modelleri başlatıldı")
             
