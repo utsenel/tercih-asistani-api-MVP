@@ -1,28 +1,26 @@
 """
 Konfigürasyon modülü - Tüm ayarları buradan import edin
-GÜNCELLENMIŞ - Multi-provider desteği ile
+Multi-provider desteği ile (OpenAI + Gemini)
 """
 
-# MEVCUT import'larınızı şu şekilde güncelleyin:
 from .llm_config import (
     LLMConfigs, 
-    LLMProvider,              # YENİ
+    LLMProvider,
     VectorConfig, 
     CSVConfig,
-    PerformanceConfig,        # YENİ
-    FallbackConfig           # YENİ
+    PerformanceConfig,
+    FallbackConfig
 )
 from .prompts import PromptTemplates, CSV_KEYWORDS
 from .settings import AppSettings, DatabaseSettings, MessageSettings, ValidationSettings
 
-# YENİ export listesi:
 __all__ = [
     "LLMConfigs",
-    "LLMProvider",           # YENİ
+    "LLMProvider",
     "VectorConfig", 
     "CSVConfig",
-    "PerformanceConfig",     # YENİ
-    "FallbackConfig",        # YENİ
+    "PerformanceConfig",
+    "FallbackConfig",
     "PromptTemplates",
     "CSV_KEYWORDS",
     "AppSettings",
