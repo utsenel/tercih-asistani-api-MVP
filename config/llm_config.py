@@ -1,33 +1,24 @@
-"""
-LLM Konfigürasyonları - Tüm model ayarları burada
-"""
+# config/llm_config.py - Basit ve esnek
+
 import os
 from dataclasses import dataclass
 from typing import Dict, Any
 from enum import Enum
 
-# YENİ: Provider enum'u ekleyin
 class LLMProvider(Enum):
-    """LLM sağlayıcı türleri"""
     OPENAI = "openai"
     GOOGLE = "google"
 
 @dataclass
 class LLMConfig:
-    """LLM model konfigürasyonu"""
     provider: LLMProvider
     model: str
     temperature: float
     max_tokens: int = 500
     max_retries: int = 3
     timeout: int = 100
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Backward compatibility için"""
-        return self.to_langchain_params()
     
     def to_langchain_params(self) -> Dict[str, Any]:
-        """Provider'a göre LangChain parametrelerini döndür"""
         if self.provider == LLMProvider.OPENAI:
             return {
                 "api_key": os.getenv("OPENAI_API_KEY"),
@@ -42,108 +33,59 @@ class LLMConfig:
                 "google_api_key": os.getenv("GOOGLE_API_KEY"),
                 "model": self.model,
                 "temperature": self.temperature,
-                "max_output_tokens": self.max_tokens,  # Gemini için farklı parametre adı
+                "max_output_tokens": self.max_tokens,
                 "max_retries": self.max_retries,
                 "timeout": self.timeout
             }
-        else:
-            raise ValueError(f"Desteklenmeyen provider: {self.provider}")
 
-
-# LLM Model Konfigürasyonları
+# ⚡ TEK SATIRDA MODEL DEĞİŞTİRME
 class LLMConfigs:
-    """Tüm LLM konfigürasyonları"""
+    # İstediğiniz provider/model kombinasyonunu seçin:
     
-    # Soru uygunluk değerlendirmesi - Daha karmaşık karar verme
-    EVALUATION = LLMConfig(
-        provider=LLMProvider.GOOGLE,
-        model="gemini-1.5-flash",
-        temperature=0.3,
-        max_tokens=100,
-        max_retries=3,
-        timeout=60
-    )
-    
-    # Soru düzeltme - Deterministik olmalı
-    CORRECTION = LLMConfig(
-        provider=LLMProvider.GOOGLE,
-        model="gemini-1.5-flash",
-        temperature=0.1,
-        max_tokens=200,
-        max_retries=3,
-        timeout=60
-    )
-    
-    # Arama sorgusu optimizasyonu - Yaratıcı olabilir
-    SEARCH_OPTIMIZER = LLMConfig(
-        provider=LLMProvider.OPENAI,
-        model="gpt-4o",
-        temperature=0.3,
-        max_tokens=150,
-        max_retries=3,
-        timeout=60
-    )
-    
-    # CSV agent - Analitik düşünme
-    CSV_AGENT = LLMConfig(
-        provider=LLMProvider.OPENAI,
-        model="gpt-4o",
-        temperature=0.3,
-        max_tokens=600,
-        max_retries=3,
-        timeout=100
-    )
-    
-    # Final yanıt - En önemli, kaliteli olmalı
-    FINAL_RESPONSE = LLMConfig(
-        provider=LLMProvider.OPENAI,
-        model="gpt-4o",
-        temperature=0.3,
-        max_tokens=500,
-        max_retries=3,
-        timeout=120
-    )
+    EVALUATION = LLMConfig(LLMProvider.GOOGLE, "gemini-1.5-flash", 0.3, 50, timeout=30)
+    CORRECTION = LLMConfig(LLMProvider.GOOGLE, "gemini-1.5-flash", 0.1, 150, timeout=30)
+    SEARCH_OPTIMIZER = LLMConfig(LLMProvider.OPENAI, "gpt-4o", 0.3, 150, timeout=60)
+    CSV_AGENT = LLMConfig(LLMProvider.OPENAI, "gpt-4o", 0.3, 600, timeout=100)
+    FINAL_RESPONSE = LLMConfig(LLMProvider.OPENAI, "gpt-4o", 0.3, 500, timeout=120)
 
-# Vector Search Ayarları
+# chat_processor.py için factory
+class LLMFactory:
+    @staticmethod
+    def create_llm(config):
+        params = config.to_langchain_params()
+        
+        if config.provider == LLMProvider.OPENAI:
+            from langchain_openai import ChatOpenAI
+            return ChatOpenAI(**params)
+        elif config.provider == LLMProvider.GOOGLE:
+            from langchain_google_genai import ChatGoogleGenerativeAI
+            return ChatGoogleGenerativeAI(**params)
+
+# Diğer config'ler aynı
 class VectorConfig:
-    """Vector arama konfigürasyonları"""
     SIMILARITY_TOP_K = 3
     SEARCH_TYPE = "similarity"
     SCORE_THRESHOLD = 0.7
 
+class CSVConfig:
+    SAMPLE_ROWS = 68
+    MAX_ROWS_FOR_FULL_ANALYSIS = 100
 
-# Performance Monitoring
 class PerformanceConfig:
-    """Performans izleme ayarları"""
     ENABLE_METRICS = True
     LOG_RESPONSE_TIMES = True
     LOG_TOKEN_USAGE = True
     LOG_PROVIDER_DISTRIBUTION = True
-    
-    # Response time thresholds (saniye)
     WARNING_THRESHOLD = 5.0
     ERROR_THRESHOLD = 15.0
-    
-    # Token usage tracking
     TRACK_DAILY_USAGE = True
     DAILY_TOKEN_LIMIT = 1000000
 
-# Fallback Strategy
 class FallbackConfig:
-    """Fallback stratejileri"""
     ENABLE_FALLBACK = True
-    
-    # Gemini fail olursa OpenAI'a fallback
     GEMINI_TO_OPENAI_FALLBACK = {
         "gemini-1.5-flash": "gpt-4o-mini",
         "gemini-1.5-pro": "gpt-4o"
     }
-    
-    # Retry stratejisi
     MAX_FALLBACK_ATTEMPTS = 2
     FALLBACK_DELAY = 1.0
-# CSV Analiz Ayarları  
-class CSVConfig:
-    """CSV analiz konfigürasyonları"""
-    SAMPLE_ROWS = 68  # CSV'den kaç satır örnek gönderilecek
-    MAX_ROWS_FOR_FULL_ANALYSIS = 100  # Tam analiz için maksimum satır
