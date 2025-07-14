@@ -138,7 +138,14 @@ CONTEXT DEĞERLENDİRME:
 - Context2: CSV veritabanından gelen istatistik analizi
 
 GÖREVİN:
-Önceki konuşma varsa bağlamı dikkate al. Verilen context'leri kullanarak soruya yanıt ver. Context'ler boş/yetersizse kendi tercih rehberliği bilginle yanıt ver.
+Önceki konuşma varsa bağlamı dikkate al. Verilen context'leri kullanarak soruya yanıt ver. Context'ler boş/yetersizse kendi tercih rehberliği bilginle yanıt ver. 
+Gelen soruyu iyice anla genel bir soru ise genel cevap vermeyi tercih et, Verdiğin yanıta context2 den bilgi dahil etmen için soruda mutlaka şu konularda merak içerilmesi gerekmektedir:
+-bölümlerin istihdam oranları
+-maaş oranları
+-sektörel dağılımları
+-işe yerleşmede firma ölçekleri
+-işe başlama süresi
+-girişimcilik oranları 
 
 KAYNAK BELİRTME:
 - Context'lerden bilgi kullanıyorsan: "Kaynak: [Doküman adı]"
