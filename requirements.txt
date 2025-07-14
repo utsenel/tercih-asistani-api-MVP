@@ -11,3 +11,4 @@ aiofiles==23.2.1
 httpx==0.25.2
 astrapy==1.2.0
 redis==5.0.1
+langchain-google-genai==1.0.1
