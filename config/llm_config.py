@@ -30,7 +30,7 @@ class LLMConfig:
             }
         elif self.provider == LLMProvider.GOOGLE:
             return {
-                "google_api_key": os.getenv("GOOGLE_API_KEY"),
+                "api_key": os.getenv("GOOGLE_API_KEY"),
                 "model": self.model,
                 "temperature": self.temperature,
                 "max_output_tokens": self.max_tokens,
