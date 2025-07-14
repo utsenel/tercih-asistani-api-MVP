@@ -21,6 +21,10 @@ class LLMConfig:
     max_tokens: int = 500
     max_retries: int = 3
     timeout: int = 100
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Backward compatibility için"""
+        return self.to_langchain_params()
     
     def to_langchain_params(self) -> Dict[str, Any]:
         """Provider'a göre LangChain parametrelerini döndür"""
