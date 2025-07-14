@@ -44,9 +44,9 @@ class LLMConfigs:
     
     EVALUATION = LLMConfig(LLMProvider.GOOGLE, "gemini-1.5-flash", 0.3, 50, timeout=30)
     CORRECTION = LLMConfig(LLMProvider.GOOGLE, "gemini-1.5-flash", 0.1, 150, timeout=30)
-    SEARCH_OPTIMIZER = LLMConfig(LLMProvider.OPENAI, "gpt-4o", 0.3, 150, timeout=60)
-    CSV_AGENT = LLMConfig(LLMProvider.OPENAI, "gpt-4o", 0.3, 600, timeout=100)
-    FINAL_RESPONSE = LLMConfig(LLMProvider.OPENAI, "gpt-4o", 0.3, 500, timeout=120)
+    SEARCH_OPTIMIZER = LLMConfig(LLMProvider.GOOGLE, "gemini-1.5-pro", 0.3, 150, timeout=60)
+    CSV_AGENT = LLMConfig(LLMProvider.OPENAI, "gpt-4o-mini", 0.3, 600, timeout=100)
+    FINAL_RESPONSE = LLMConfig(LLMProvider.OPENAI, "gpt-4o-mini", 0.3, 500, timeout=120)
 
 # chat_processor.py için factory
 class LLMFactory:
@@ -85,7 +85,7 @@ class FallbackConfig:
     ENABLE_FALLBACK = True
     GEMINI_TO_OPENAI_FALLBACK = {
         "gemini-1.5-flash": "gpt-4o-mini",
-        "gemini-1.5-pro": "gpt-4o"
+        "gemini-1.5-pro": "gpt-4o-mini"
     }
     MAX_FALLBACK_ATTEMPTS = 2
     FALLBACK_DELAY = 1.0
