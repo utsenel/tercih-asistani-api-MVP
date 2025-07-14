@@ -68,7 +68,7 @@ class TercihAsistaniProcessor:
             logger.info(f"   GOOGLE_API_KEY: {'✅ Set' if os.getenv('GOOGLE_API_KEY') else '❌ Missing'}")
             google_key = os.getenv('GOOGLE_API_KEY')
             if google_key:
-            logger.info(f"   GOOGLE_API_KEY starts with: {google_key[:10]}...")
+                logger.info(f"   GOOGLE_API_KEY starts with: {google_key[:10]}...")
  
             # Multi-provider LLM'leri başlat
             self.llm_evaluation = LLMFactory.create_llm(LLMConfigs.EVALUATION)
