@@ -65,6 +65,10 @@ class TercihAsistaniProcessor:
             
             logger.info(f"🔑 Environment check:")
             logger.info(f"   OPENAI_API_KEY: {'✅ Set' if os.getenv('OPENAI_API_KEY') else '❌ Missing'}")
+            openai_key = os.getenv('OPENAI_API_KEY')
+            if openai_key:
+                logger.info(f"   OPENAI_API_KEY starts with: {openai_key[:10]}...")
+            
             logger.info(f"   GOOGLE_API_KEY: {'✅ Set' if os.getenv('GOOGLE_API_KEY') else '❌ Missing'}")
             google_key = os.getenv('GOOGLE_API_KEY')
             if google_key:
