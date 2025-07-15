@@ -90,9 +90,11 @@ class PerformanceConfig:
 
 class FallbackConfig:
     ENABLE_FALLBACK = True
-    GEMINI_TO_OPENAI_FALLBACK = {
+    FALLBACK_MAPPINGS = {
         "gemini-1.5-flash": "gpt-4o-mini",
-        "gemini-1.5-pro": "gpt-4o-mini"
+        "gemini-1.5-pro": "gpt-4o-mini",
+        "claude-3-5-sonnet-20241022": "gpt-4o",  # YENİ!
+        "claude-3-haiku-20240307": "gpt-4o-mini"  # YENİ!
     }
     MAX_FALLBACK_ATTEMPTS = 2
     FALLBACK_DELAY = 1.0
