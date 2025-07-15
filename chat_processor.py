@@ -433,7 +433,7 @@ class TercihAsistaniProcessor:
             logger.error(f"❌ Düzeltme hatası: {e}")
             return question
 
-    async def _get_vector_context_native(self, question: str) -> str:
+    async def _get_vector_context(self, question: str) -> str:
         """Vector database'den context al - DÜZELTME"""
         try:
             if not self.vectorstore:
@@ -514,7 +514,98 @@ class TercihAsistaniProcessor:
             logger.error(f"❌ Vector context genel hatası: {e}")
             return "Vector arama genel hatası"
 
-    
+    async def _get_csv_context_safe(self, question: str) -> str:
+        """Güvenli CSV analiz - Detaylı logging"""
+        try:
+            csv_start = time.time()
+            
+            if self.csv_data is None:
+                logger.warning("⚠️ CSV verileri mevcut değil")
+                return "CSV verileri mevcut değil"
+            
+            if not self.llm_csv_agent:
+                logger.error("❌ CSV Agent LLM mevcut değil!")
+                return "CSV analizi için gerekli model yüklenmedi"
+            
+            logger.info(f"📊 CSV analiz başlatılıyor: '{question[:50]}...'")
+            
+            # CSV filtreleme logic
+            filter_start = time.time()
+            question_lower = question.lower()
+            
+            # Bölüm adını bul
+            bolum_adi = None
+            for bolum in self.csv_data['bolum_adi'].unique():
+                if bolum.lower() in question_lower:
+                    bolum_adi = bolum
+                    break
+            
+            # Metrik analizi
+            metrik_map = {
+                "istihdam": [col for col in self.csv_data.columns if "istihdam" in col],
+                "maaş": [col for col in self.csv_data.columns if col.startswith("maas_")],
+                "firma": [col for col in self.csv_data.columns if col.startswith("firma_")],
+                "girişim": [col for col in self.csv_data.columns if "girisim" in col],
+                "sektör": [col for col in self.csv_data.columns if col.startswith("sektor_")]
+            }
+            
+            metrikler = []
+            detected_topics = []
+            for anahtar, cols in metrik_map.items():
+                if anahtar in question_lower:
+                    metrikler.extend(cols)
+                    detected_topics.append(anahtar)
+            
+            if not metrikler:
+                metrikler = [col for col in self.csv_data.columns if col not in ['bolum_adi', 'gosterge_id', 'bolum_id']]
+                detected_topics = ["genel"]
+            
+            # Filter uygula
+            filtered = self.csv_data
+            if bolum_adi:
+                filtered = filtered[filtered['bolum_adi'] == bolum_adi]
+            
+            if filtered.empty:
+                filtered = self.csv_data.head(CSVConfig.SAMPLE_ROWS)
+            
+            selected_cols = ['bolum_adi', 'gosterge_id'] + metrikler[:20]  # Limitle
+            selected = filtered[selected_cols]
+            
+            filter_time = time.time() - filter_start
+            
+            logger.info(f"📊 CSV FİLTRELEME SONUCU ({filter_time:.2f}s):")
+            logger.info(f"   🎯 Tespit edilen bölüm: {bolum_adi or 'Yok'}")
+            logger.info(f"   📈 Tespit edilen konular: {detected_topics}")
+            logger.info(f"   📋 Seçilen metrikler: {len(metrikler)} adet")
+            logger.info(f"   📊 Filtrelenmiş veri: {len(selected)} satır x {len(selected.columns)} kolon")
+            
+            csv_snippet = selected.to_string(index=False)
+            
+            # CSV Agent çağrısı
+            agent_start = time.time()
+            result = await self.llm_csv_agent.ainvoke(
+                self.csv_agent_prompt.format(
+                    question=question,
+                    csv_data=csv_snippet
+                )
+            )
+            
+            analysis = result.content.strip()
+            agent_time = time.time() - agent_start
+            
+            total_time = time.time() - csv_start
+            
+            logger.info(f"✅ CSV AGENT SONUCU ({agent_time:.2f}s):")
+            logger.info(f"   📝 Analiz uzunluğu: {len(analysis)} karakter")
+            logger.info(f"   📄 Analiz özet: '{analysis[:100]}...'")
+            logger.info(f"   ⏱️ Toplam CSV süresi: {total_time:.2f}s")
+            
+            return analysis
+            
+        except Exception as e:
+            total_time = time.time() - csv_start
+            logger.error(f"❌ CSV analiz hatası ({total_time:.2f}s): {e}")
+            return "CSV analizi sırasında hata oluştu"
 
     async def _generate_final_response_safe(self, question: str, context1: str, context2: str, history: str = "") -> str:
         """Güvenli final yanıt oluşturma - Detaylı logging"""
