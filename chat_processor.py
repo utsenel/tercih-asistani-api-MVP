@@ -309,7 +309,7 @@ class TercihAsistaniProcessor:
             
             # Context detaylarını logla
             logger.info(f"📄 CONTEXT1 (Vector) - {len(context1)} karakter:")
-            logger.info(f"   İlk 200 karakter: '{context1[:200]}...'")
+            logger.info(f"   İlk 200 karakter: '{context1[:500]}...'")
             
             logger.info(f"📊 CONTEXT2 (CSV) - {len(context2)} karakter:")
             logger.info(f"   İlk 200 karakter: '{context2[:200]}...'")
