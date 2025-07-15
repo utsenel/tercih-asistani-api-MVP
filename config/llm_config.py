@@ -29,10 +29,8 @@ class LLMConfig:
                 "model": self.model,
                 "temperature": self.temperature,
                 "max_tokens": self.max_tokens,
-                # DEĞIŞEN: max_retries ve timeout'u model_kwargs'a taşındı
-                "model_kwargs": {
-                    "max_retries": self.max_retries,
-                    "timeout": self.timeout
+                "max_retries": self.max_retries,
+                "timeout": self.timeout
                 }
             }
         elif self.provider == LLMProvider.GOOGLE:
@@ -73,12 +71,12 @@ class LLMConfigs:
     
     # Google modelleri için timeout artırıldı, OpenAI fallback eklendi
     EVALUATION = LLMConfig(
-        provider=LLMProvider.OPENAI, 
-        model="gpt-4o-mini", 
+        provider=LLMProvider.ANTHROPIC, 
+        model="claude-3-haiku-20240307", 
         temperature=0.3, 
         max_tokens=50, 
-        timeout=45,  # Artırıldı
-        max_retries=2,  # Azaltıldı
+        #timeout=45,  # Artırıldı
+        #max_retries=2,  # Azaltıldı
         fallback_provider=LLMProvider.OPENAI,
         fallback_model="gpt-4o-mini"
     )
