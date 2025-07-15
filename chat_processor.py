@@ -13,6 +13,7 @@ import re
 from astrapy import DataAPIClient
 from langchain_openai import OpenAIEmbeddings
 from memory import ConversationMemory
+from langchain_anthropic import ChatAnthropic
 #from astrapy.info import VectorServiceOptions
 
 # Config imports
@@ -65,7 +66,7 @@ class TercihAsistaniProcessor:
             
             logger.info(f"🔑 Environment check:")
             logger.info(f"   OPENAI_API_KEY: {'✅ Set' if os.getenv('OPENAI_API_KEY') else '❌ Missing'}")
-           
+            logger.info(f"   ANTHROPIC_API_KEY: {'✅ Set' if os.getenv('ANTHROPIC_API_KEY') else '❌ Missing'}")
             logger.info(f"   GOOGLE_API_KEY: {'✅ Set' if os.getenv('GOOGLE_API_KEY') else '❌ Missing'}")
   
             # Multi-provider LLM'leri başlat
