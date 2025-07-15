@@ -144,7 +144,7 @@ class TercihAsistaniProcessor:
                         setattr(self, f"llm_{name}", None)
 
     async def _initialize_astradb(self):
-        """AstraDB bağlantısını başlat - Field mapping ile"""
+        """AstraDB bağlantısını başlat - Custom solution"""
         try:
             logger.info("🔌 AstraDB bağlantısı başlatılıyor...")
             
@@ -156,75 +156,135 @@ class TercihAsistaniProcessor:
             if not token or not endpoint:
                 logger.error("❌ AstraDB credentials eksik")
                 self.vectorstore = None
+                self.astra_collection = None
                 return
             
-            # Client oluştur
-            client = DataAPIClient(token=token)
-            async_database = client.get_async_database(endpoint)
-            
-            # Collection'ları listele
-            collections = await async_database.list_collection_names()
-            logger.info(f"📚 Mevcut collection'lar: {collections}")
-            
-            if collection_name not in collections:
-                logger.error(f"❌ Collection '{collection_name}' bulunamadı!")
-                self.vectorstore = None
-                return
-            
-            logger.info(f"✅ Collection '{collection_name}' bulundu!")
-            
-            # Embedding oluştur
-            logger.info("🔧 Embedding oluşturuluyor - 1536 dimensions...")
-            embedding = OpenAIEmbeddings(
-                model="text-embedding-3-small",
-                dimensions=1536,
-                openai_api_key=os.getenv("OPENAI_API_KEY")
-            )
-            logger.info("✅ Embedding oluşturuldu")
-            
-            # 🎯 FIELD MAPPING ile VectorStore oluştur
+            # Direct AstraDB Collection Access
             try:
-                logger.info("🔧 VectorStore oluşturuluyor - Field mapping ile...")
-                self.vectorstore = AstraDBVectorStore(
-                    token=token,
-                    api_endpoint=endpoint,
-                    collection_name=collection_name,
-                    embedding=embedding,
-                    # 🎯 FIELD MAPPING - Collection'daki field'ları LangChain'e tanıt
-                    content_field="$vectorize",  # Metin içeriği bu field'da
-                    metadata_field="metadata",   # Metadata bu field'da (zaten doğru)
+                client = DataAPIClient(token=token)
+                async_database = client.get_async_database(endpoint)
+                
+                # Collection'ları listele
+                collections = await async_database.list_collection_names()
+                logger.info(f"📚 Mevcut collection'lar: {collections}")
+                
+                if collection_name not in collections:
+                    logger.error(f"❌ Collection '{collection_name}' bulunamadı!")
+                    self.vectorstore = None
+                    self.astra_collection = None
+                    return
+                
+                # Direct collection access
+                self.astra_collection = async_database.get_collection(collection_name)
+                logger.info(f"✅ Direct collection access başarılı: {collection_name}")
+                
+                # Embedding oluştur (sadece query için)
+                self.embedding_model = OpenAIEmbeddings(
+                    model="text-embedding-3-small",
+                    dimensions=1536,
+                    openai_api_key=os.getenv("OPENAI_API_KEY")
                 )
-                logger.info("✅ VectorStore instance oluşturuldu - Field mapping ile")
+                logger.info("✅ Embedding model hazır")
                 
                 # Test arama
-                logger.info("🧪 Vector arama testi başlıyor...")
-                test_docs = self.vectorstore.similarity_search("üniversite tercih", k=2)
-                logger.info(f"✅ Test arama başarılı: {len(test_docs)} doküman bulundu")
+                logger.info("🧪 Custom vector arama testi başlıyor...")
+                test_results = await self._custom_vector_search("üniversite tercih", k=2)
+                logger.info(f"✅ Custom test arama başarılı: {len(test_results)} doküman")
                 
-                # Detaylı test sonuçları
-                if test_docs:
-                    for i, doc in enumerate(test_docs):
-                        logger.info(f"📄 Doc {i+1}: {doc.page_content[:100]}...")
-                        logger.info(f"🏷️ Metadata: {doc.metadata}")
+                if test_results:
+                    for i, doc in enumerate(test_results):
+                        logger.info(f"📄 Doc {i+1}: {doc['content'][:100]}...")
+                        logger.info(f"🏷️ Metadata: {doc['metadata']}")
                         
-                    logger.info(f"🎯 VectorStore tamamen çalışıyor!")
-                else:
-                    logger.warning("⚠️ Test arama 0 doküman döndürdü")
+                    logger.info("🎯 Custom VectorStore tamamen çalışıyor!")
                     
-            except Exception as vs_error:
-                logger.error(f"❌ VectorStore oluşturma hatası: {vs_error}")
-                
-                # Eğer field mapping desteklenmiyorsa
-                if "content_field" in str(vs_error) or "unexpected keyword" in str(vs_error):
-                    logger.error("🔍 Field mapping desteklenmiyor - LangChain versiyonu eski olabilir")
-                    logger.info("💡 Çözüm: Custom field mapping implementasyonu gerekli")
-                
+                    # LangChain VectorStore'u None bırak, custom kullanacağız
+                    self.vectorstore = None
+                else:
+                    logger.warning("⚠️ Custom test arama 0 doküman döndürdü")
+                    
+            except Exception as e:
+                logger.error(f"❌ Custom AstraDB setup hatası: {e}")
+                self.astra_collection = None
                 self.vectorstore = None
                 
         except Exception as e:
             logger.error(f"❌ AstraDB genel hatası: {e}")
+            self.astra_collection = None
             self.vectorstore = None
+    
+    async def _custom_vector_search(self, query: str, k: int = 3):
+        """Custom vector search - Direct AstraDB API kullanarak"""
+        try:
+            if not self.astra_collection or not self.embedding_model:
+                return []
+            
+            # Query'yi embedding'e çevir
+            query_embedding = await self.embedding_model.aembed_query(query)
+            
+            # AstraDB vector search
+            cursor = self.astra_collection.find(
+                sort={"$vector": query_embedding},
+                limit=k,
+                projection={"$vectorize": 1, "metadata": 1}  # Sadece gerekli field'ları al
+            )
+            
+            # Sonuçları LangChain Document formatına çevir
+            results = []
+            async for doc in cursor:
+                # Field mapping: $vectorize → content
+                content = doc.get("$vectorize", "")
+                metadata = doc.get("metadata", {})
+                
+                results.append({
+                    "content": content,
+                    "metadata": metadata
+                })
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"❌ Custom vector search hatası: {e}")
+            return []
 
+    async def _get_vector_context_safe(self, question: str) -> str:
+        """Güvenli vector context - Custom search ile"""
+        try:
+            if not self.astra_collection:
+                logger.warning("Custom vector search mevcut değil")
+                return "Vector arama mevcut değil"
+                
+            # Query optimization (güvenli)
+            optimized_text = question
+            if self.llm_search_optimizer:
+                try:
+                    optimized_query = await self.llm_search_optimizer.ainvoke(
+                        self.search_optimizer_prompt.format(question=question)
+                    )
+                    optimized_text = optimized_query.content.strip()
+                    logger.info(f"✅ Optimize edilmiş sorgu: {optimized_text}")
+                except Exception as e:
+                    logger.warning(f"Query optimization hatası: {e}")
+            
+            # Custom vector arama
+            docs = await self._custom_vector_search(optimized_text, k=VectorConfig.SIMILARITY_TOP_K)
+            
+            if not docs:
+                return "İlgili doküman bulunamadı"
+            
+            # Context oluştur
+            context = ""
+            for i, doc in enumerate(docs):
+                file_path = doc["metadata"].get("file_path", "Bilinmeyen kaynak")
+                content = doc["content"][:500]  # İlk 500 karakter
+                context += f"Dosya: {file_path}\nİçerik: {content}\n\n"
+            
+            logger.info(f"✅ Custom vector context: {len(context)} karakter")
+            return context
+            
+        except Exception as e:
+            logger.error(f"❌ Custom vector context hatası: {e}")
+            return f"Vector arama hatası: {str(e)[:100]}"
     async def _initialize_csv(self):
         """CSV verilerini güvenli yükle"""
         try:
