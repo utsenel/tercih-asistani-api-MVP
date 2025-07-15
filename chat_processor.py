@@ -434,7 +434,7 @@ class TercihAsistaniProcessor:
             return question
 
     async def _get_vector_context_native(self, question: str) -> str:
-        """Native AstraDB ile vector arama - TAMAMEN YENİ"""
+        """Native AstraDB ile vector arama - VERİ YAPISI DÜZELTMESİ"""
         try:
             vector_start = time.time()
             
@@ -464,13 +464,38 @@ class TercihAsistaniProcessor:
                 logger.error(f"❌ Embedding oluşturma hatası: {e}")
                 return "Embedding oluşturulamadı"
             
-            # Native vector search
+            # ÖNCE VERİ YAPISINI ANLA - Sample document çek
+            try:
+                sample_doc = list(self.astra_collection.find({}, limit=1))
+                if sample_doc:
+                    logger.info(f"📋 SAMPLE DOCUMENT STRUCTURE:")
+                    logger.info(f"   Keys: {list(sample_doc[0].keys())}")
+                    for key, value in sample_doc[0].items():
+                        if key != '$vector':  # Vector'ü loglamayalım, çok uzun
+                            logger.info(f"   {key}: {str(value)[:100]}...")
+                
+            except Exception as sample_error:
+                logger.warning(f"⚠️ Sample doc çekme hatası: {sample_error}")
+            
+            # Native vector search - PROJECTION'U GENİŞLET
             try:
                 search_results = self.astra_collection.find(
                     {},  # Empty filter - tüm belgelerden ara
                     sort={"$vector": query_embedding},  # Vector similarity sort
                     limit=VectorConfig.SIMILARITY_TOP_K,
-                    projection={"text": 1, "metadata": 1, "_id": 0}  # Sadece gerekli alanlar
+                    projection={
+                        # Olası text field adları
+                        "text": 1, 
+                        "content": 1, 
+                        "page_content": 1,
+                        "body": 1,
+                        "document": 1,
+                        # Metadata
+                        "metadata": 1,
+                        "source": 1,
+                        "file_path": 1,
+                        "_id": 0
+                    }
                 )
                 
                 # Results'ı listeye çevir
@@ -481,51 +506,86 @@ class TercihAsistaniProcessor:
                     logger.warning("❌ Hiç doküman bulunamadı")
                     return "İlgili doküman bulunamadı"
                 
-                # Doküman içeriklerini birleştir
+                # DETAYLI VERİ ANALİZİ
+                for i, doc in enumerate(docs):
+                    logger.info(f"🔍 DOC {i+1} ANALİZİ:")
+                    logger.info(f"   Available keys: {list(doc.keys())}")
+                    for key, value in doc.items():
+                        if isinstance(value, str) and len(value) > 10:
+                            logger.info(f"   {key}: '{value[:150]}...' ({len(value)} karakter)")
+                        else:
+                            logger.info(f"   {key}: {type(value)} - {str(value)[:100]}")
+                
+                # Doküman içeriklerini birleştir - FLEXIBLE CONTENT EXTRACTION
                 context_parts = []
                 total_chars = 0
                 
                 for i, doc in enumerate(docs):
                     try:
-                        # Text alanından içeriği al
-                        content = doc.get('text', '').strip()
+                        # Olası content field'larını dene
+                        content = None
+                        possible_content_fields = ['text', 'content', 'page_content', 'body', 'document']
                         
-                        # Metadata'dan kaynak bilgisini al
-                        metadata = doc.get('metadata', {})
-                        source = metadata.get('source', 'Bilinmeyen kaynak')
+                        for field in possible_content_fields:
+                            if field in doc and doc[field]:
+                                content = str(doc[field]).strip()
+                                logger.info(f"✅ Doküman {i+1} içerik bulundu: '{field}' alanında")
+                                break
                         
                         if not content:
-                            logger.warning(f"⚠️ Doküman {i+1} boş içerik")
+                            logger.warning(f"⚠️ Doküman {i+1} - hiçbir content field'ında veri yok")
                             continue
                         
+                        # Metadata'dan kaynak bilgisini al - FLEXIBLE SOURCE EXTRACTION
+                        source = "Bilinmeyen kaynak"
+                        
+                        # Farklı source field'larını dene
+                        if 'metadata' in doc and isinstance(doc['metadata'], dict):
+                            metadata = doc['metadata']
+                            source = metadata.get('source', metadata.get('file_path', metadata.get('filename', source)))
+                        elif 'source' in doc:
+                            source = doc['source']
+                        elif 'file_path' in doc:
+                            source = doc['file_path']
+                        
                         # İçeriği kısalt
-                        if len(content) > 400:
-                            content = content[:400] + "..."
+                        if len(content) > 500:
+                            content = content[:500] + "..."
                         
                         # Kaynak formatını düzelt
                         if isinstance(source, str):
                             source_name = source.split('/')[-1] if '/' in source else source
-                            if 'Ä°ZÃ' in source_name or any(char in source_name for char in ['Ã', 'Â']):
+                            if any(char in source_name for char in ['Ä°', 'ZÃ', 'Ã', 'Â']):
                                 source_name = "İZÜ YKS Tercih Rehberi.pdf"
+                            if not source_name or source_name == "Bilinmeyen kaynak":
+                                source_name = "Tercih Rehberi"
                         else:
                             source_name = "Rehber Dokümanı"
                         
                         context_parts.append(f"**Kaynak**: {source_name}\n**İçerik**: {content}")
                         total_chars += len(content)
                         
-                        logger.info(f"✅ Doküman {i+1}: {source_name} - {len(content)} karakter")
+                        logger.info(f"✅ Doküman {i+1} işlendi: {source_name} - {len(content)} karakter")
                         
-                        # Maximum 1200 karakter sınırı
-                        if total_chars > 1200:
+                        # Maximum 1500 karakter sınırı
+                        if total_chars > 1500:
                             break
                             
                     except Exception as doc_error:
-                        logger.warning(f"⚠️ Doküman {i+1} işleme hatası: {doc_error}")
+                        logger.error(f"❌ Doküman {i+1} işleme hatası: {doc_error}")
                         continue
                 
                 if not context_parts:
                     logger.error("❌ Hiçbir doküman işlenemedi!")
-                    return "Dokümanlar işlenemedi"
+                    
+                    # DEBUG: İlk dokümanın tüm içeriğini logla
+                    if docs:
+                        logger.error("🔍 FIRST DOC FULL DEBUG:")
+                        first_doc = docs[0]
+                        for key, value in first_doc.items():
+                            logger.error(f"   {key}: {type(value)} = {str(value)[:200]}")
+                    
+                    return "Dokümanlar işlenemedi - veri yapısı sorunu"
                 
                 final_context = "\n\n".join(context_parts)
                 vector_time = time.time() - vector_start
@@ -533,7 +593,7 @@ class TercihAsistaniProcessor:
                 logger.info(f"✅ NATIVE VECTOR ARAMA TAMAMLANDI ({vector_time:.2f}s):")
                 logger.info(f"   📄 İşlenen doküman: {len(context_parts)} adet")
                 logger.info(f"   📝 Toplam context: {len(final_context)} karakter")
-                logger.info(f"   📄 Context önizleme: '{final_context[:200]}...'")
+                logger.info(f"   📄 Context önizleme: '{final_context[:300]}...'")
                 
                 return final_context
                     
@@ -546,6 +606,70 @@ class TercihAsistaniProcessor:
             logger.error(f"❌ Vector context genel hatası ({vector_time:.2f}s): {e}")
             return "Vector arama genel hatası"
     
+    async def debug_astra_documents(self) -> Dict[str, Any]:
+        """AstraDB doküman yapısını debug et"""
+        try:
+            if not self.astra_collection:
+                return {"status": "error", "message": "AstraDB collection mevcut değil"}
+            
+            logger.info("🔍 ASTRA DOKÜMAN YAPISI DEBUG...")
+            
+            # İlk 3 dokümanı çek
+            sample_docs = list(self.astra_collection.find({}, limit=3))
+            
+            debug_info = {
+                "total_documents": len(sample_docs),
+                "sample_documents": []
+            }
+            
+            for i, doc in enumerate(sample_docs):
+                doc_info = {
+                    "document_id": i + 1,
+                    "available_fields": list(doc.keys()),
+                    "field_analysis": {}
+                }
+                
+                # Her field'ı analiz et
+                for key, value in doc.items():
+                    if key == '$vector':
+                        doc_info["field_analysis"][key] = {
+                            "type": type(value).__name__,
+                            "length": len(value) if isinstance(value, (list, str)) else "N/A",
+                            "sample": "Vector data (hidden)"
+                        }
+                    elif isinstance(value, str):
+                        doc_info["field_analysis"][key] = {
+                            "type": "string",
+                            "length": len(value),
+                            "sample": value[:200] + "..." if len(value) > 200 else value,
+                            "has_content": len(value.strip()) > 0
+                        }
+                    elif isinstance(value, dict):
+                        doc_info["field_analysis"][key] = {
+                            "type": "dict",
+                            "keys": list(value.keys()),
+                            "sample": str(value)[:200] + "..." if len(str(value)) > 200 else str(value)
+                        }
+                    else:
+                        doc_info["field_analysis"][key] = {
+                            "type": type(value).__name__,
+                            "sample": str(value)[:100]
+                        }
+                
+                debug_info["sample_documents"].append(doc_info)
+                
+                # Log her doküman için
+                logger.info(f"📄 DOKÜMAN {i+1}:")
+                logger.info(f"   Available fields: {list(doc.keys())}")
+                for key, analysis in doc_info["field_analysis"].items():
+                    if key != '$vector':
+                        logger.info(f"   {key}: {analysis}")
+            
+            return {"status": "success", "debug_info": debug_info}
+            
+        except Exception as e:
+            logger.error(f"❌ Astra debug hatası: {e}")
+            return {"status": "error", "message": str(e)}
 
     async def _get_csv_context_safe(self, question: str) -> str:
         """CSV analiz - HIZLANDIRILMIŞ VE GÜVENLİ VERSİYON"""
