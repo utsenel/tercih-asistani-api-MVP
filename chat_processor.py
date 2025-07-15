@@ -49,7 +49,7 @@ class LLMFactory:
 
 class TercihAsistaniProcessor:
     """
-    Astrapy native API ile güncellenmiş processor
+    HIZLANDIRILMIŞ VERSION - Railway timeout fix
     """
     
     def __init__(self):
@@ -59,7 +59,7 @@ class TercihAsistaniProcessor:
         self.llm_csv_agent = None
         self.llm_final = None
         
-        # YENİ: Astrapy native components
+        # Native components
         self.openai_client = None
         self.astra_database = None
         self.astra_collection = None
@@ -87,20 +87,22 @@ class TercihAsistaniProcessor:
             raise
 
     async def initialize(self):
-        """Gelişmiş hata yönetimi ile başlatma"""
+        """HIZLANDIRILMIŞ başlatma"""
         try:
             logger.info("🚀 TercihAsistaniProcessor başlatılıyor...")
             
-            # API Key kontrolü
-            self._check_api_keys()
+            # API Key kontrolü (basit)
+            if not os.getenv("OPENAI_API_KEY"):
+                raise ValueError("OPENAI_API_KEY zorunlu!")
             
             # OpenAI client'ı başlat
-            self._initialize_openai_client()
+            self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            logger.info("✅ OpenAI client başlatıldı")
             
-            # LLM'leri sıralı başlat (fallback ile)
-            await self._initialize_llms()
+            # HIZLI LLM'leri paralel başlat
+            await self._initialize_llms_fast()
             
-            # AstraDB bağlantısını native API ile başlat
+            # AstraDB bağlantısı
             await self._initialize_astradb_native()
             
             # CSV verilerini yükle
@@ -112,178 +114,124 @@ class TercihAsistaniProcessor:
             logger.error(f"❌ Initialization hatası: {e}")
             raise
 
-    def _check_api_keys(self):
-        """API anahtarlarını kontrol et"""
-        keys = {
-            "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY"),
-            "ANTHROPIC_API_KEY": os.getenv("ANTHROPIC_API_KEY"),
-            "GOOGLE_API_KEY": os.getenv("GOOGLE_API_KEY"),
-            "ASTRA_DB_TOKEN": os.getenv("ASTRA_DB_TOKEN"),
-            "ASTRA_DB_API_ENDPOINT": os.getenv("ASTRA_DB_API_ENDPOINT")
-        }
-        
-        logger.info("🔑 API Key durumu:")
-        for key, value in keys.items():
-            status = "✅ Set" if value else "❌ Missing"
-            logger.info(f"   {key}: {status}")
-            
-        # Critical keys check
-        if not keys["OPENAI_API_KEY"]:
-            raise ValueError("OPENAI_API_KEY zorunlu!")
-
-    def _initialize_openai_client(self):
-        """OpenAI client'ı başlat"""
+    async def _initialize_llms_fast(self):
+        """SADECE OPENAI modelleri - maksimum hız"""
         try:
-            self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-            logger.info("✅ OpenAI client başlatıldı")
-        except Exception as e:
-            logger.error(f"❌ OpenAI client hatası: {e}")
-            raise
-
-    async def _initialize_llms(self):
-        """Fallback stratejisi ile LLM'leri başlat"""
-        llm_configs = {
-            "evaluation": LLMConfigs.EVALUATION,
-            "correction": LLMConfigs.CORRECTION, 
-            "search_optimizer": LLMConfigs.SEARCH_OPTIMIZER,
-            "csv_agent": LLMConfigs.CSV_AGENT,
-            "final": LLMConfigs.FINAL_RESPONSE
-        }
-        
-        for name, config in llm_configs.items():
-            try:
-                llm = LLMFactory.create_llm(config)
-                setattr(self, f"llm_{name}", llm)
-                logger.info(f"✅ {name} LLM başarılı: {config.model}")
-                
-            except Exception as e:
-                logger.error(f"❌ {name} LLM hatası: {e}")
-                
-                # Critical LLM'ler için fallback
-                if name in ["csv_agent", "final"]:
-                    logger.warning(f"🔄 {name} için OpenAI fallback...")
-                    fallback_config = LLMConfigs.FINAL_RESPONSE  # OpenAI model
-                    try:
-                        llm = LLMFactory.create_llm(fallback_config)
-                        setattr(self, f"llm_{name}", llm)
-                        logger.info(f"✅ {name} fallback başarılı")
-                    except Exception as fb_error:
-                        logger.error(f"❌ {name} fallback hatası: {fb_error}")
-                        setattr(self, f"llm_{name}", None)
-
-    async def _initialize_astradb_native(self):
-        """AstraDB native API ile bağlantı"""
-        try:
-            logger.info("🔌 AstraDB native API bağlantısı başlatılıyor...")
-            
-            # Astra client oluştur
-            astra_client = DataAPIClient(DatabaseSettings.ASTRA_DB_TOKEN)
-            
-            # Database bağlantısı
-            self.astra_database = astra_client.get_database(
-                DatabaseSettings.ASTRA_DB_API_ENDPOINT
+            # Tüm kritik işlemler için hızlı OpenAI modelleri
+            fast_config = LLMConfig(
+                provider=LLMProvider.OPENAI,
+                model="gpt-4o-mini",
+                temperature=0.3,
+                max_tokens=300,
+                timeout=15  # 15 saniye timeout
             )
             
-            # Collection al
-            collection_name = DatabaseSettings.ASTRA_DB_COLLECTION
-            self.astra_collection = self.astra_database.get_collection(collection_name)
+            # Tüm LLM'ler aynı hızlı model
+            self.llm_evaluation = LLMFactory.create_llm(fast_config)
+            self.llm_correction = LLMFactory.create_llm(fast_config)
+            self.llm_search_optimizer = LLMFactory.create_llm(fast_config)
+            self.llm_csv_agent = LLMFactory.create_llm(fast_config)
+            self.llm_final = LLMFactory.create_llm(fast_config)
             
-            logger.info(f"✅ AstraDB native bağlantısı başarılı - Collection: {collection_name}")
-            
-            # Test sorgusu
-            test_results = list(self.astra_collection.find({}, limit=1))
-            logger.info(f"✅ Test sorgusu başarılı: {len(test_results)} doküman bulundu")
+            logger.info("✅ Tüm LLM'ler hızlı OpenAI modeli ile başlatıldı")
             
         except Exception as e:
-            logger.error(f"❌ AstraDB native bağlantı hatası: {e}")
-            self.astra_database = None
+            logger.error(f"❌ Fast LLM initialization hatası: {e}")
+            raise
+
+    async def _initialize_astradb_native(self):
+        """Hızlı AstraDB bağlantısı"""
+        try:
+            logger.info("🔌 AstraDB native API bağlantısı...")
+            
+            astra_client = DataAPIClient(DatabaseSettings.ASTRA_DB_TOKEN)
+            self.astra_database = astra_client.get_database(DatabaseSettings.ASTRA_DB_API_ENDPOINT)
+            self.astra_collection = self.astra_database.get_collection(DatabaseSettings.ASTRA_DB_COLLECTION)
+            
+            logger.info(f"✅ AstraDB başarılı")
+            
+        except Exception as e:
+            logger.error(f"❌ AstraDB hatası: {e}")
             self.astra_collection = None
 
     async def _initialize_csv(self):
-        """CSV verilerini güvenli yükle"""
+        """Hızlı CSV yükleme"""
         try:
             csv_path = DatabaseSettings.CSV_FILE_PATH
-            
-            if not csv_path or not os.path.exists(csv_path):
-                logger.warning(f"⚠️ CSV dosyası bulunamadı: {csv_path}")
+            if csv_path and os.path.exists(csv_path):
+                self.csv_data = pd.read_csv(csv_path)
+                logger.info(f"✅ CSV: {len(self.csv_data)} satır")
+            else:
                 self.csv_data = None
-                return
-            
-            self.csv_data = pd.read_csv(csv_path)
-            
-            # Veri validasyonu
-            if self.csv_data.empty:
-                logger.warning("⚠️ CSV dosyası boş")
-                self.csv_data = None
-                return
-            
-            # Gerekli kolonların varlığını kontrol et
-            required_cols = ['bolum_adi', 'gosterge_id']
-            missing_cols = [col for col in required_cols if col not in self.csv_data.columns]
-            
-            if missing_cols:
-                logger.error(f"❌ CSV'de eksik kolonlar: {missing_cols}")
-                self.csv_data = None
-                return
-            
-            logger.info(f"✅ CSV verisi yüklendi: {len(self.csv_data)} satır, {len(self.csv_data.columns)} kolon")
-            
         except Exception as e:
-            logger.error(f"❌ CSV yükleme hatası: {e}")
+            logger.warning(f"CSV hatası: {e}")
             self.csv_data = None
 
     async def process_message(self, message: str, session_id: str = "default") -> Dict[str, Any]:
-        """Gelişmiş hata yönetimi ile mesaj işleme"""
+        """SÜPER HIZLI mesaj işleme - max 20 saniye"""
+        start_time = asyncio.get_event_loop().time()
+        
         try:
-            logger.info(f"📨 Mesaj işleniyor - Session: {session_id}")
+            logger.info(f"⚡ HIZLI işleme başlıyor - Session: {session_id}")
             
-            # Adım 1: Soru uygunluk değerlendirmesi (hata toleranslı)
-            evaluation_result = await self._evaluate_question_safe(message)
+            # Adım 1: Hızlı değerlendirme (2s max)
+            evaluation_task = asyncio.create_task(self._evaluate_question_ultra_fast(message))
             
-            # Adım 2: Koşullu yönlendirme
+            # Adım 2: Paralel düzeltme ve context alma (başla ama bekle)
+            correction_task = asyncio.create_task(self._correct_question_fast(message))
+            
+            # Evaluation sonucunu bekle
+            evaluation_result = await evaluation_task
+            
             if evaluation_result == "Uzmanlık dışı soru":
-                return {
-                    "response": MessageSettings.ERROR_EXPERTISE_OUT,
-                    "sources": []
-                }
+                return {"response": MessageSettings.ERROR_EXPERTISE_OUT, "sources": []}
             
             if evaluation_result == "SELAMLAMA":
                 return {
-                    "response": "Merhaba! Ben bir üniversite tercih asistanıyım. Size YKS tercihleri, bölüm seçimi, kariyer planlaması konularında yardımcı olabilirim. Hangi konuda bilgi almak istiyorsunuz?",
+                    "response": "Merhaba! Size üniversite tercih konularında yardımcı olabilirim. Hangi konuda bilgi almak istiyorsunuz?",
                     "sources": []
                 }
             
-            # Adım 3: Soru düzeltme (güvenli)
-            corrected_question = await self._correct_question_safe(message)
+            # Düzeltilmiş soruyu al
+            corrected_question = await correction_task
             
-            # Adım 4: Paralel işlemler (hata toleranslı)
-            context1, context2 = await asyncio.gather(
-                self._get_vector_context_native(corrected_question),
-                self._get_csv_context_safe(corrected_question),
-                return_exceptions=True
-            )
+            # Adım 3: GERÇEK PARALEL context alma (en kritik optimizasyon)
+            context_tasks = [
+                asyncio.create_task(self._get_vector_context_ultra_fast(corrected_question)),
+                asyncio.create_task(self._get_csv_context_ultra_fast(corrected_question))
+            ]
             
-            # Exception'ları handle et
+            # Paralel context'leri bekle (max 10s timeout)
+            try:
+                context1, context2 = await asyncio.wait_for(
+                    asyncio.gather(*context_tasks, return_exceptions=True),
+                    timeout=10.0
+                )
+            except asyncio.TimeoutError:
+                logger.warning("⚠️ Context timeout, fallback kullanılıyor")
+                context1 = "Vector arama zaman aşımı"
+                context2 = "CSV analizi zaman aşımı"
+            
+            # Exception handling
             if isinstance(context1, Exception):
-                logger.error(f"Vector context hatası: {context1}")
                 context1 = "Vector arama başarısız"
-                
             if isinstance(context2, Exception):
-                logger.error(f"CSV context hatası: {context2}")
                 context2 = "CSV analizi başarısız"
             
-            # Adım 5: Final yanıt oluşturma
+            # Adım 4: Hızlı final yanıt
             conversation_history = self.memory.get_history(session_id)
-            final_response = await self._generate_final_response_safe(
+            final_response = await self._generate_final_response_ultra_fast(
                 question=corrected_question,
                 context1=context1,
                 context2=context2,
                 history=conversation_history
             )
 
-            # Memory'ye kaydet
-            self.memory.add_message(session_id, "user", message)
-            self.memory.add_message(session_id, "assistant", final_response)
+            # Memory'ye kaydet (async olarak, bekleme)
+            asyncio.create_task(self._save_to_memory_async(session_id, message, final_response))
+
+            elapsed = asyncio.get_event_loop().time() - start_time
+            logger.info(f"⚡ İşlem tamamlandı: {elapsed:.2f}s")
 
             return {
                 "response": final_response,
@@ -291,262 +239,194 @@ class TercihAsistaniProcessor:
             }
             
         except Exception as e:
-            logger.error(f"❌ Mesaj işleme hatası: {e}")
-            return {
-                "response": MessageSettings.ERROR_GENERAL,
-                "sources": []
-            }
+            elapsed = asyncio.get_event_loop().time() - start_time
+            logger.error(f"❌ Hızlı işleme hatası ({elapsed:.2f}s): {e}")
+            return {"response": MessageSettings.ERROR_GENERAL, "sources": []}
 
-    async def _evaluate_question_safe(self, question: str) -> str:
-        """Güvenli soru değerlendirme"""
+    async def _save_to_memory_async(self, session_id: str, user_msg: str, assistant_msg: str):
+        """Memory'ye asenkron kaydet - ana işlemi bloklamaz"""
+        try:
+            self.memory.add_message(session_id, "user", user_msg)
+            self.memory.add_message(session_id, "assistant", assistant_msg)
+        except:
+            pass  # Memory hatası ana işlemi etkilemesin
+
+    async def _evaluate_question_ultra_fast(self, question: str) -> str:
+        """Ultra hızlı değerlendirme - 2s max"""
         try:
             if not self.llm_evaluation:
-                logger.warning("Evaluation LLM mevcut değil, varsayılan UYGUN")
                 return "UYGUN"
                 
-            result = await self.llm_evaluation.ainvoke(
-                self.evaluation_prompt.format(question=question)
+            # Timeout ile koruma
+            result = await asyncio.wait_for(
+                self.llm_evaluation.ainvoke(self.evaluation_prompt.format(question=question)),
+                timeout=3.0
             )
-            evaluation_result = result.content.strip()
-            logger.info(f"✅ Soru değerlendirme: {evaluation_result}")
             
-            if "SELAMLAMA" in evaluation_result.upper():
+            evaluation_result = result.content.strip().upper()
+            
+            if "SELAMLAMA" in evaluation_result:
                 return "SELAMLAMA"
-            elif "UYGUN" in evaluation_result.upper():
+            elif "UYGUN" in evaluation_result:
                 return "UYGUN"
             else:
                 return "Uzmanlık dışı soru"
                 
+        except asyncio.TimeoutError:
+            logger.warning("⚠️ Evaluation timeout, varsayılan UYGUN")
+            return "UYGUN"
         except Exception as e:
-            logger.error(f"❌ Değerlendirme hatası: {e}")
-            return "UYGUN"  # Güvenli varsayılan
+            logger.error(f"❌ Evaluation hatası: {e}")
+            return "UYGUN"
 
-    async def _correct_question_safe(self, question: str) -> str:
-        """Güvenli soru düzeltme"""
+    async def _correct_question_fast(self, question: str) -> str:
+        """Hızlı soru düzeltme"""
         try:
             if not self.llm_correction:
-                logger.warning("Correction LLM mevcut değil, orijinal soru")
                 return question
                 
-            result = await self.llm_correction.ainvoke(
-                self.correction_prompt.format(question=question)
+            result = await asyncio.wait_for(
+                self.llm_correction.ainvoke(self.correction_prompt.format(question=question)),
+                timeout=5.0
             )
-            corrected = result.content.strip()
-            logger.info(f"✅ Düzeltilmiş soru: {corrected}")
-            return corrected
+            
+            return result.content.strip()
+            
+        except asyncio.TimeoutError:
+            logger.warning("⚠️ Correction timeout, orijinal soru")
+            return question
         except Exception as e:
-            logger.error(f"❌ Düzeltme hatası: {e}")
+            logger.error(f"❌ Correction hatası: {e}")
             return question
 
-    async def _get_vector_context_native(self, question: str) -> str:
-        """Native Astrapy API ile vector search"""
+    async def _get_vector_context_ultra_fast(self, question: str) -> str:
+        """Ultra hızlı vector search"""
         try:
             if not self.astra_collection:
-                logger.warning("Astra collection mevcut değil")
                 return "Vector arama mevcut değil"
-                
-            # Query optimization (güvenli)
-            optimized_text = question
-            if self.llm_search_optimizer:
-                try:
-                    optimized_query = await self.llm_search_optimizer.ainvoke(
-                        self.search_optimizer_prompt.format(question=question)
-                    )
-                    optimized_text = optimized_query.content.strip()
-                    logger.info(f"✅ Optimize edilmiş sorgu: {optimized_text}")
-                except Exception as e:
-                    logger.warning(f"Query optimization hatası: {e}")
             
-            # Embedding oluştur
-            query_embedding = self.get_embedding(optimized_text)
-            logger.info(f"✅ Query embedding oluşturuldu: {len(query_embedding)} boyut")
+            # Query optimization SKIP - direkt ara
+            query_embedding = self.get_embedding(question)
             
-            # Native vector search
+            # Hızlı arama (limit 2)
             results = self.astra_collection.find(
                 {},
                 sort={"$vector": query_embedding},
-                limit=VectorConfig.SIMILARITY_TOP_K
+                limit=2  # Daha az sonuç = daha hızlı
             )
             
-            # Sonuçları işle
             docs = list(results)
-            logger.info(f"✅ Vector search sonuç: {len(docs)} doküman bulundu")
             
             if not docs:
                 return "İlgili doküman bulunamadı"
             
-            # Context oluştur
+            # Kompakt context
             context = ""
-            for i, doc in enumerate(docs):
-                # Astrapy'da metadata farklı yapıda olabilir
-                file_path = doc.get('metadata', {}).get('file_path', doc.get('file_path', 'Bilinmeyen kaynak'))
-                content = doc.get('content', doc.get('text', str(doc)))[:500]
-                context += f"Dosya: {file_path}\nİçerik: {content}\n\n"
+            for doc in docs:
+                file_path = doc.get('metadata', {}).get('file_path', 'Kaynak')
+                content = str(doc.get('content', doc.get('text', '')))[:300]  # Daha kısa
+                context += f"{file_path}: {content}\n"
             
-            logger.info(f"✅ Native vector context: {len(context)} karakter")
             return context
             
         except Exception as e:
-            logger.error(f"❌ Native vector context hatası: {e}")
-            return f"Vector arama hatası: {str(e)[:100]}"
+            logger.error(f"❌ Ultra fast vector hatası: {e}")
+            return "Vector arama hatası"
 
-    async def _get_csv_context_safe(self, question: str) -> str:
-        """Güvenli CSV analiz"""
+    async def _get_csv_context_ultra_fast(self, question: str) -> str:
+        """Ultra hızlı CSV analiz"""
         try:
-            if self.csv_data is None:
-                return "CSV verileri mevcut değil"
+            if self.csv_data is None or not self.llm_csv_agent:
+                return "CSV analizi mevcut değil"
             
-            if not self.llm_csv_agent:
-                logger.error("❌ CSV Agent LLM mevcut değil!")
-                return "CSV analizi için gerekli model yüklenmedi"
-            
-            # CSV filtreleme (aynı logic)
+            # Basit filtreleme
             question_lower = question.lower()
             
-            # Bölüm adını bul
-            bolum_adi = None
-            for bolum in self.csv_data['bolum_adi'].unique():
-                if bolum.lower() in question_lower:
-                    bolum_adi = bolum
-                    break
+            # Sadece istihdam/maaş keyword'ü varsa CSV analizi yap
+            csv_keywords = ["istihdam", "maaş", "gelir", "çalışma", "iş"]
+            if not any(kw in question_lower for kw in csv_keywords):
+                return "Bu soru için CSV analizi gerekli değil"
             
-            # Filtering logic (aynı)
-            metrik_map = {
-                "istihdam": [col for col in self.csv_data.columns if "istihdam" in col],
-                "maaş": [col for col in self.csv_data.columns if col.startswith("maas_")],
-                "firma": [col for col in self.csv_data.columns if col.startswith("firma_")],
-                "girişim": [col for col in self.csv_data.columns if "girisim" in col],
-                "sektör": [col for col in self.csv_data.columns if col.startswith("sektor_")]
-            }
+            # Hızlı sample data
+            sample_data = self.csv_data.head(10).to_string(index=False)
             
-            metrikler = []
-            for anahtar, cols in metrik_map.items():
-                if anahtar in question_lower:
-                    metrikler.extend(cols)
-            
-            if not metrikler:
-                metrikler = [col for col in self.csv_data.columns if col not in ['bolum_adi', 'gosterge_id', 'bolum_id']]
-            
-            # Filter uygula
-            filtered = self.csv_data
-            if bolum_adi:
-                filtered = filtered[filtered['bolum_adi'] == bolum_adi]
-            
-            if filtered.empty:
-                filtered = self.csv_data.head(CSVConfig.SAMPLE_ROWS)
-            
-            selected_cols = ['bolum_adi', 'gosterge_id'] + metrikler
-            selected = filtered[selected_cols]
-            
-            csv_snippet = selected.to_string(index=False)
-            
-            # CSV Agent çağrısı
-            result = await self.llm_csv_agent.ainvoke(
-                self.csv_agent_prompt.format(
-                    question=question,
-                    csv_data=csv_snippet
-                )
+            result = await asyncio.wait_for(
+                self.llm_csv_agent.ainvoke(
+                    self.csv_agent_prompt.format(question=question, csv_data=sample_data)
+                ),
+                timeout=5.0
             )
             
-            analysis = result.content.strip()
-            logger.info(f"✅ CSV analiz: {len(analysis)} karakter")
-            return analysis
+            return result.content.strip()
             
+        except asyncio.TimeoutError:
+            logger.warning("⚠️ CSV timeout")
+            return "CSV analizi zaman aşımı"
         except Exception as e:
-            logger.error(f"❌ CSV analiz hatası: {e}")
-            return "CSV analizi sırasında hata oluştu"
+            logger.error(f"❌ Ultra fast CSV hatası: {e}")
+            return "CSV analizi hatası"
 
-    async def _generate_final_response_safe(self, question: str, context1: str, context2: str, history: str = "") -> str:
-        """Güvenli final yanıt oluşturma"""
+    async def _generate_final_response_ultra_fast(self, question: str, context1: str, context2: str, history: str = "") -> str:
+        """Ultra hızlı final yanıt"""
         try:
             if not self.llm_final:
-                return "Yanıt oluşturma servisi geçici olarak kullanılamıyor. Lütfen tekrar deneyin."
+                return "Sistem geçici olarak kullanılamıyor. Lütfen tekrar deneyin."
             
-            result = await self.llm_final.ainvoke(
-                self.final_prompt.format(
-                    question=question,
-                    context1=context1,
-                    context2=context2,
-                    history=history
-                )
+            result = await asyncio.wait_for(
+                self.llm_final.ainvoke(
+                    self.final_prompt.format(
+                        question=question,
+                        context1=context1,
+                        context2=context2,
+                        history=history[:200]  # History'yi kısalt
+                    )
+                ),
+                timeout=8.0
             )
             
-            final_response = result.content.strip()
-            logger.info(f"✅ Final yanıt: {len(final_response)} karakter")
-            return final_response
+            return result.content.strip()
             
+        except asyncio.TimeoutError:
+            logger.warning("⚠️ Final response timeout")
+            return "Yanıt oluşturma zaman aşımı. Lütfen tekrar deneyin."
         except Exception as e:
-            logger.error(f"❌ Final yanıt hatası: {e}")
-            return "Yanıt oluşturulurken hata oluştu. Lütfen tekrar deneyin."
+            logger.error(f"❌ Final response hatası: {e}")
+            return "Yanıt oluşturulurken hata oluştu."
 
     def _extract_sources(self, context1: str, context2: str) -> List[str]:
-        """Kaynaklarını çıkar"""
+        """Hızlı kaynak çıkarma"""
         sources = []
         
-        if "Dosya:" in context1 and "bulunamadı" not in context1:
-            sources.append(MessageSettings.SOURCES["YOK_REPORT"])
-            sources.append(MessageSettings.SOURCES["IZU_GUIDE"])
+        if context1 and "bulunamadı" not in context1 and "hatası" not in context1:
+            sources.append("Tercih Rehberi Dokümanları")
         
-        if context2 and "mevcut değil" not in context2 and "hata" not in context2:
-            sources.append(MessageSettings.SOURCES["UNIVERI_DB"])
+        if context2 and "gerekli değil" not in context2 and "hatası" not in context2:
+            sources.append("Cumhurbaşkanlığı UNİ-VERİ veritabanı (2024)")
         
         return sources
 
     async def test_all_connections(self) -> Dict[str, str]:
-        """Gelişmiş bağlantı testi"""
+        """Hızlı connection test"""
         results = {}
         
-        # OpenAI Client test
+        # OpenAI test
         try:
-            if self.openai_client:
-                test_embedding = self.get_embedding("test")
-                results["OpenAI Client"] = f"✅ Bağlı ({len(test_embedding)} boyut embedding)"
-            else:
-                results["OpenAI Client"] = "❌ Client başlatılmadı"
+            test_embedding = self.get_embedding("test")
+            results["OpenAI"] = f"✅ Bağlı ({len(test_embedding)} boyut)"
         except Exception as e:
-            results["OpenAI Client"] = f"❌ Hata: {str(e)[:50]}"
+            results["OpenAI"] = f"❌ Hata: {str(e)[:30]}"
         
-        # LLM testleri
-        llm_tests = [
-            ("Evaluation", self.llm_evaluation),
-            ("Correction", self.llm_correction), 
-            ("Search Optimizer", self.llm_search_optimizer),
-            ("CSV Agent", self.llm_csv_agent),
-            ("Final Response", self.llm_final)
-        ]
-        
-        for name, llm in llm_tests:
-            try:
-                if llm:
-                    await llm.ainvoke("Test")
-                    results[name] = "✅ Bağlı ve çalışıyor"
-                else:
-                    results[name] = "❌ Model yüklenmedi"
-            except Exception as e:
-                results[name] = f"❌ Hata: {str(e)[:50]}"
-        
-        # Native AstraDB test
+        # AstraDB test
         try:
             if self.astra_collection:
                 test_results = list(self.astra_collection.find({}, limit=1))
-                results["AstraDB Native"] = f"✅ Bağlı ({len(test_results)} test doküman)"
+                results["AstraDB"] = f"✅ Bağlı ({len(test_results)} test)"
             else:
-                results["AstraDB Native"] = "❌ Collection başlatılmadı"
+                results["AstraDB"] = "❌ Bağlantı yok"
         except Exception as e:
-            results["AstraDB Native"] = f"❌ Hata: {str(e)[:50]}"
+            results["AstraDB"] = f"❌ Hata: {str(e)[:30]}"
         
         # CSV test
-        if self.csv_data is not None:
-            results["CSV"] = f"✅ Yüklü ({len(self.csv_data)} satır)"
-        else:
-            results["CSV"] = "❌ Yüklenmedi"
-        
-        # Memory test
-        try:
-            self.memory.add_message("test", "user", "test")
-            history = self.memory.get_history("test")
-            results["Memory"] = "✅ Redis bağlı" if history else "⚠️ Memory çalışıyor ama boş"
-        except Exception as e:
-            results["Memory"] = f"❌ Hata: {str(e)[:50]}"
+        results["CSV"] = f"✅ {len(self.csv_data)} satır" if self.csv_data is not None else "❌ Yok"
         
         return results
