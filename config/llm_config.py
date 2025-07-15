@@ -72,8 +72,8 @@ class LLMConfigs:
     
     # Google modelleri için timeout artırıldı, OpenAI fallback eklendi
     EVALUATION = LLMConfig(
-        provider=LLMProvider.GOOGLE, 
-        model="gemini-1.5-flash", 
+        provider=LLMProvider.OPENAI, 
+        model="gpt-4o-mini", 
         temperature=0.3, 
         max_tokens=50, 
         timeout=45,  # Artırıldı
@@ -117,7 +117,7 @@ class LLMConfigs:
     
     FINAL_RESPONSE = LLMConfig(
         provider=LLMProvider.OPENAI, 
-        model="gpt-4o-mini", 
+        model="gpt-4o", 
         temperature=0.3, 
         max_tokens=500, 
         timeout=120,
