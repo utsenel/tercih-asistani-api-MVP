@@ -347,15 +347,16 @@ class TercihAsistaniProcessor:
                 
             # Query optimization (güvenli)
             optimized_text = question
-            if self.llm_search_optimizer:
-                try:
-                    optimized_query = await self.llm_search_optimizer.ainvoke(
-                        self.search_optimizer_prompt.format(question=question)
-                    )
-                    optimized_text = optimized_query.content.strip()
-                    logger.info(f"✅ Optimize edilmiş sorgu: {optimized_text}")
-                except Exception as e:
-                    logger.warning(f"Query optimization hatası: {e}")
+            # ESKI KOD (yorum satırı yap):
+            # try:
+            #     optimized_query = await self.llm_search_optimizer.ainvoke(
+            #         self.search_optimizer_prompt.format(question=question)
+            #     )
+            #     optimized_text = optimized_query.content.strip()
+            #     logger.info(f"Optimize edilmiş sorgu: {optimized_text}")
+            # except Exception as e:
+            #     logger.warning(f"Sorgu optimizasyonu başarısız, orijinal soru kullanılıyor: {e}")
+            #     optimized_text = question
             
             # Embedding oluştur
             query_embedding = self.get_embedding(optimized_text)
