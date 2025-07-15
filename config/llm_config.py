@@ -1,5 +1,3 @@
-# config/llm_config.py - Basit ve esnek
-
 import os
 from dataclasses import dataclass
 from typing import Dict, Any
@@ -8,6 +6,7 @@ from enum import Enum
 class LLMProvider(Enum):
     OPENAI = "openai"
     GOOGLE = "google"
+    ANTHROPIC = "anthropic"  # YENİ!
 
 @dataclass
 class LLMConfig:
@@ -37,18 +36,23 @@ class LLMConfig:
                 "max_retries": self.max_retries,
                 "timeout": self.timeout
             }
+        elif self.provider == LLMProvider.ANTHROPIC:  # YENİ!
+            return {
+                "anthropic_api_key": os.getenv("ANTHROPIC_API_KEY"),
+                "model": self.model,
+                "temperature": self.temperature,
+                "max_tokens": self.max_tokens,
+                "max_retries": self.max_retries,
+                "timeout": self.timeout
+            }
 
-# ⚡ TEK SATIRDA MODEL DEĞİŞTİRME
 class LLMConfigs:
-    # İstediğiniz provider/model kombinasyonunu seçin:
-    
     EVALUATION = LLMConfig(LLMProvider.GOOGLE, "gemini-1.5-flash", 0.3, 50, timeout=30)
     CORRECTION = LLMConfig(LLMProvider.GOOGLE, "gemini-1.5-flash", 0.1, 150, timeout=30)
     SEARCH_OPTIMIZER = LLMConfig(LLMProvider.GOOGLE, "gemini-1.5-flash", 0.3, 150, timeout=60)
-    CSV_AGENT = LLMConfig(LLMProvider.GOOGLE, "gemini-1.5-flash", 0.3, 600, timeout=100)
+    CSV_AGENT = LLMConfig(LLMProvider.ANTHROPIC, "claude-3-5-sonnet-20241022", 0.3, 600, timeout=100)  # Claude!
     FINAL_RESPONSE = LLMConfig(LLMProvider.GOOGLE, "gemini-1.5-flash", 0.3, 500, timeout=120)
 
-# chat_processor.py için factory
 class LLMFactory:
     @staticmethod
     def create_llm(config):
@@ -60,6 +64,9 @@ class LLMFactory:
         elif config.provider == LLMProvider.GOOGLE:
             from langchain_google_genai import ChatGoogleGenerativeAI
             return ChatGoogleGenerativeAI(**params)
+        elif config.provider == LLMProvider.ANTHROPIC:  # YENİ!
+            from langchain_anthropic import ChatAnthropic
+            return ChatAnthropic(**params)
 
 # Diğer config'ler aynı
 class VectorConfig:
