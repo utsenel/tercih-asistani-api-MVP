@@ -30,7 +30,7 @@ class DatabaseSettings:
     # AstraDB
     ASTRA_DB_TOKEN = os.getenv("ASTRA_DB_TOKEN")
     ASTRA_DB_API_ENDPOINT = os.getenv("ASTRA_DB_API_ENDPOINT")
-    ASTRA_DB_COLLECTION = os.getenv("ASTRA_DB_COLLECTION")
+    ASTRA_DB_COLLECTION = os.getenv("ASTRA_DB_COLLECTION", "tercihrehberligi_pdf_collection_new")
     ASTRA_DB_ENVIRONMENT = os.getenv("ASTRA_DB_ENVIRONMENT")
     
     # CSV
