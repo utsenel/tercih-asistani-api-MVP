@@ -182,6 +182,23 @@ async def test_connections():
             "timestamp": time.time()
         }
 
+@app.get("/debug-astra")
+async def debug_astra():
+    """
+    AstraDB doküman yapısını debug et
+    """
+    try:
+        debug_results = await processor.debug_astra_documents()
+        return {
+            "status": "success",
+            "debug_info": debug_results
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e)
+        }
+
 @app.get("/debug-csv")
 async def debug_csv():
     """
