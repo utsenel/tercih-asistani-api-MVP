@@ -434,7 +434,7 @@ class TercihAsistaniProcessor:
             return question
 
     async def _get_vector_context_native(self, question: str) -> str:
-        """Native AstraDB ile vector arama - VERİ YAPISI DÜZELTMESİ"""
+        """Native AstraDB ile vector arama - DÜZELTILMIŞ VERSİYON"""
         try:
             vector_start = time.time()
             
@@ -464,27 +464,47 @@ class TercihAsistaniProcessor:
                 logger.error(f"❌ Embedding oluşturma hatası: {e}")
                 return "Embedding oluşturulamadı"
             
-            # ÖNCE VERİ YAPISINI ANLA - Sample document çek
+            # ÖNCE VERİ YAPISINI ANLA - Sample document çek (GENİŞLETİLMİŞ PROJECTION)
             try:
-                sample_doc = list(self.astra_collection.find({}, limit=1))
+                sample_doc = list(self.astra_collection.find({}, limit=1, projection={
+                    "$vectorize": 1,  # ANA CONTENT FIELD - YENİ!
+                    "text": 1, 
+                    "content": 1, 
+                    "page_content": 1,
+                    "body": 1,
+                    "document": 1,
+                    "metadata": 1,
+                    "source": 1,
+                    "file_path": 1,
+                    "_id": 1
+                }))
+                
                 if sample_doc:
                     logger.info(f"📋 SAMPLE DOCUMENT STRUCTURE:")
                     logger.info(f"   Keys: {list(sample_doc[0].keys())}")
                     for key, value in sample_doc[0].items():
-                        if key != '$vector':  # Vector'ü loglamayalım, çok uzun
-                            logger.info(f"   {key}: {str(value)[:100]}...")
-                
+                        if key == '$vector':
+                            logger.info(f"   {key}: Vector data ({len(value) if isinstance(value, list) else 'N/A'} dimensions)")
+                        elif key == '$vectorize':  # YENİ - bu ana content olabilir
+                            logger.info(f"   {key}: '{str(value)[:200]}...' ({len(str(value))} karakter)")
+                        elif isinstance(value, str):
+                            logger.info(f"   {key}: '{value[:100]}...' ({len(value)} karakter)")
+                        else:
+                            logger.info(f"   {key}: {type(value)} = {str(value)[:100]}...")
+                    
             except Exception as sample_error:
                 logger.warning(f"⚠️ Sample doc çekme hatası: {sample_error}")
             
-            # Native vector search - PROJECTION'U GENİŞLET
+            # Native vector search - GENİŞLETİLMİŞ PROJECTION ile
             try:
                 search_results = self.astra_collection.find(
                     {},  # Empty filter - tüm belgelerden ara
                     sort={"$vector": query_embedding},  # Vector similarity sort
                     limit=VectorConfig.SIMILARITY_TOP_K,
                     projection={
-                        # Olası text field adları
+                        # ANA CONTENT FIELD - YENİ!
+                        "$vectorize": 1,  # Bu muhtemelen asıl content
+                        # Diğer olası content fields
                         "text": 1, 
                         "content": 1, 
                         "page_content": 1,
@@ -494,7 +514,7 @@ class TercihAsistaniProcessor:
                         "metadata": 1,
                         "source": 1,
                         "file_path": 1,
-                        "_id": 0
+                        "_id": 1  # Debug için
                     }
                 )
                 
@@ -506,37 +526,61 @@ class TercihAsistaniProcessor:
                     logger.warning("❌ Hiç doküman bulunamadı")
                     return "İlgili doküman bulunamadı"
                 
-                # DETAYLI VERİ ANALİZİ
+                # DETAYLI VERİ ANALİZİ - $vectorize'a özel dikkat
                 for i, doc in enumerate(docs):
                     logger.info(f"🔍 DOC {i+1} ANALİZİ:")
                     logger.info(f"   Available keys: {list(doc.keys())}")
+                    
+                    # $vectorize field'ına özel dikkat
+                    if '$vectorize' in doc:
+                        vectorize_content = doc['$vectorize']
+                        logger.info(f"   💎 $vectorize BULUNDU: {type(vectorize_content)} - {len(str(vectorize_content))} karakter")
+                        logger.info(f"       İçerik: '{str(vectorize_content)[:200]}...'")
+                    
+                    # Diğer field'ları da kontrol et
                     for key, value in doc.items():
-                        if isinstance(value, str) and len(value) > 10:
+                        if key == '$vectorize':
+                            continue  # Yukarıda işledik
+                        elif isinstance(value, str) and len(value) > 10:
                             logger.info(f"   {key}: '{value[:150]}...' ({len(value)} karakter)")
                         else:
                             logger.info(f"   {key}: {type(value)} - {str(value)[:100]}")
                 
-                # Doküman içeriklerini birleştir - FLEXIBLE CONTENT EXTRACTION
+                # Doküman içeriklerini birleştir - $vectorize'ı ÖNCELİKLE KULLAN
                 context_parts = []
                 total_chars = 0
                 
                 for i, doc in enumerate(docs):
                     try:
-                        # Olası content field'larını dene
+                        # ÖNCE $vectorize'ı dene - bu asıl content olabilir
                         content = None
-                        possible_content_fields = ['text', 'content', 'page_content', 'body', 'document']
+                        content_source = None
                         
-                        for field in possible_content_fields:
-                            if field in doc and doc[field]:
-                                content = str(doc[field]).strip()
-                                logger.info(f"✅ Doküman {i+1} içerik bulundu: '{field}' alanında")
-                                break
+                        if '$vectorize' in doc and doc['$vectorize']:
+                            content = str(doc['$vectorize']).strip()
+                            content_source = '$vectorize'
+                            logger.info(f"✅ Doküman {i+1} - $vectorize field'ından content alındı")
+                        else:
+                            # Fallback: Diğer possible content fields
+                            possible_content_fields = ['text', 'content', 'page_content', 'body', 'document']
+                            
+                            for field in possible_content_fields:
+                                if field in doc and doc[field]:
+                                    content = str(doc[field]).strip()
+                                    content_source = field
+                                    logger.info(f"✅ Doküman {i+1} - '{field}' field'ından content alındı")
+                                    break
                         
                         if not content:
                             logger.warning(f"⚠️ Doküman {i+1} - hiçbir content field'ında veri yok")
+                            # DEBUG: Mevcut tüm field'ları logla
+                            logger.warning(f"   Mevcut fields: {list(doc.keys())}")
+                            for key, value in doc.items():
+                                if isinstance(value, str) and len(value) > 0:
+                                    logger.warning(f"   {key}: '{str(value)[:100]}...'")
                             continue
                         
-                        # Metadata'dan kaynak bilgisini al - FLEXIBLE SOURCE EXTRACTION
+                        # Metadata'dan kaynak bilgisini al
                         source = "Bilinmeyen kaynak"
                         
                         # Farklı source field'larını dene
@@ -548,13 +592,14 @@ class TercihAsistaniProcessor:
                         elif 'file_path' in doc:
                             source = doc['file_path']
                         
-                        # İçeriği kısalt
-                        if len(content) > 500:
-                            content = content[:500] + "..."
+                        # İçeriği kısalt (daha fazla content için limit artırıldı)
+                        if len(content) > 800:  # 500'den 800'e çıkarıldı
+                            content = content[:800] + "..."
                         
                         # Kaynak formatını düzelt
                         if isinstance(source, str):
                             source_name = source.split('/')[-1] if '/' in source else source
+                            # UTF-8 encoding problemi düzeltmesi
                             if any(char in source_name for char in ['Ä°', 'ZÃ', 'Ã', 'Â']):
                                 source_name = "İZÜ YKS Tercih Rehberi.pdf"
                             if not source_name or source_name == "Bilinmeyen kaynak":
@@ -565,10 +610,10 @@ class TercihAsistaniProcessor:
                         context_parts.append(f"**Kaynak**: {source_name}\n**İçerik**: {content}")
                         total_chars += len(content)
                         
-                        logger.info(f"✅ Doküman {i+1} işlendi: {source_name} - {len(content)} karakter")
+                        logger.info(f"✅ Doküman {i+1} işlendi: {source_name} - {len(content)} karakter (kaynak: {content_source})")
                         
-                        # Maximum 1500 karakter sınırı
-                        if total_chars > 1500:
+                        # Maximum 2000 karakter sınırı (artırıldı)
+                        if total_chars > 2000:
                             break
                             
                     except Exception as doc_error:
@@ -578,12 +623,17 @@ class TercihAsistaniProcessor:
                 if not context_parts:
                     logger.error("❌ Hiçbir doküman işlenemedi!")
                     
-                    # DEBUG: İlk dokümanın tüm içeriğini logla
-                    if docs:
-                        logger.error("🔍 FIRST DOC FULL DEBUG:")
-                        first_doc = docs[0]
-                        for key, value in first_doc.items():
-                            logger.error(f"   {key}: {type(value)} = {str(value)[:200]}")
+                    # EXTENDED DEBUG: Tüm dokümanları detaylı logla
+                    logger.error("🔍 EXTENDED DEBUGGING - TÜM DOKÜMANLARIN İÇERİĞİ:")
+                    for i, doc in enumerate(docs):
+                        logger.error(f"   DOKÜMAN {i+1}:")
+                        for key, value in doc.items():
+                            if isinstance(value, str):
+                                logger.error(f"     {key}: '{value[:300]}...' ({len(value)} chars)")
+                            elif isinstance(value, dict):
+                                logger.error(f"     {key}: {value}")
+                            else:
+                                logger.error(f"     {key}: {type(value)} = {str(value)[:200]}")
                     
                     return "Dokümanlar işlenemedi - veri yapısı sorunu"
                 
