@@ -49,9 +49,9 @@ class LLMConfig:
 class LLMConfigs:
     EVALUATION = LLMConfig(LLMProvider.GOOGLE, "gemini-1.5-flash", 0.3, 50, timeout=30)
     CORRECTION = LLMConfig(LLMProvider.GOOGLE, "gemini-1.5-flash", 0.1, 150, timeout=30)
-    SEARCH_OPTIMIZER = LLMConfig(LLMProvider.GOOGLE, "gpt-4o-mini", 0.3, 150, timeout=60)
-    CSV_AGENT = LLMConfig(LLMProvider.ANTHROPIC, "claude-3-5-sonnet-20241022", 0.3, 600, timeout=100)  # Claude!
-    FINAL_RESPONSE = LLMConfig(LLMProvider.GOOGLE, "gpt-4o-mini", 0.3, 500, timeout=120)
+    SEARCH_OPTIMIZER = LLMConfig(LLMProvider.OPENAI, "gpt-4o-mini", 0.3, 150, timeout=60)    
+    CSV_AGENT = LLMConfig(LLMProvider.ANTHROPIC, "claude-3-5-sonnet-20241022", 0.3, 600, timeout=100)
+    FINAL_RESPONSE = LLMConfig(LLMProvider.OPENAI, "gpt-4o-mini", 0.3, 500, timeout=120)    
 
 class LLMFactory:
     @staticmethod
