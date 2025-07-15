@@ -433,180 +433,222 @@ class TercihAsistaniProcessor:
             logger.error(f"❌ Düzeltme hatası: {e}")
             return question
 
-    async def _get_vector_context(self, question: str) -> str:
-        """Vector database'den context al - DÜZELTME"""
+    async def _get_vector_context_native(self, question: str) -> str:
+        """Native AstraDB ile vector arama - TAMAMEN YENİ"""
         try:
-            if not self.vectorstore:
-                logger.warning("Vector store mevcut değil")
+            vector_start = time.time()
+            
+            if not self.astra_collection:
+                logger.warning("❌ Astra collection mevcut değil")
                 return "Vector arama mevcut değil"
             
-            logger.info(f"🔍 Vector arama başlatılıyor: {question[:50]}...")
+            logger.info(f"🔍 Native vector arama başlatılıyor: {question[:50]}...")
             
-            # Arama sorgusunu optimize et
+            # Search query optimize et (eğer mümkünse)
+            search_text = question
+            if self.llm_search_optimizer:
+                try:
+                    optimized_query = await self.llm_search_optimizer.ainvoke(
+                        self.search_optimizer_prompt.format(question=question)
+                    )
+                    search_text = optimized_query.content.strip()
+                    logger.info(f"✨ Optimize edilmiş sorgu: {search_text[:80]}...")
+                except Exception as e:
+                    logger.warning(f"⚠️ Sorgu optimizasyonu başarısız: {e}")
+            
+            # Embedding oluştur
             try:
-                optimized_query = await self.llm_search_optimizer.ainvoke(
-                    self.search_optimizer_prompt.format(question=question)
-                )
-                optimized_text = optimized_query.content.strip()
-                logger.info(f"✨ Optimize edilmiş sorgu: {optimized_text[:100]}...")
+                query_embedding = self.get_embedding(search_text)
+                logger.info(f"✅ Query embedding oluşturuldu: {len(query_embedding)} boyut")
             except Exception as e:
-                logger.warning(f"Sorgu optimizasyonu başarısız: {e}")
-                optimized_text = question
+                logger.error(f"❌ Embedding oluşturma hatası: {e}")
+                return "Embedding oluşturulamadı"
             
-            # Vector arama yap
+            # Native vector search
             try:
-                docs = self.vectorstore.similarity_search(
-                    optimized_text, 
-                    k=VectorConfig.SIMILARITY_TOP_K
+                search_results = self.astra_collection.find(
+                    {},  # Empty filter - tüm belgelerden ara
+                    sort={"$vector": query_embedding},  # Vector similarity sort
+                    limit=VectorConfig.SIMILARITY_TOP_K,
+                    projection={"text": 1, "metadata": 1, "_id": 0}  # Sadece gerekli alanlar
                 )
+                
+                # Results'ı listeye çevir
+                docs = list(search_results)
                 logger.info(f"📄 Bulunan doküman sayısı: {len(docs)}")
                 
                 if not docs:
                     logger.warning("❌ Hiç doküman bulunamadı")
                     return "İlgili doküman bulunamadı"
                 
-                # DÜZELTME: Doküman içeriğini doğru şekilde birleştir
+                # Doküman içeriklerini birleştir
                 context_parts = []
                 total_chars = 0
                 
                 for i, doc in enumerate(docs):
-                    # Metadata'dan kaynak bilgisini al
-                    source = doc.metadata.get('file_path', 'Bilinmeyen kaynak')
-                    
-                    # Gerçek içeriği al - metadata değil!
-                    content = doc.page_content.strip()
-                    
-                    if not content or content.startswith('{'):
-                        logger.warning(f"⚠️ Doküman {i+1} boş veya hatalı içerik")
+                    try:
+                        # Text alanından içeriği al
+                        content = doc.get('text', '').strip()
+                        
+                        # Metadata'dan kaynak bilgisini al
+                        metadata = doc.get('metadata', {})
+                        source = metadata.get('source', 'Bilinmeyen kaynak')
+                        
+                        if not content:
+                            logger.warning(f"⚠️ Doküman {i+1} boş içerik")
+                            continue
+                        
+                        # İçeriği kısalt
+                        if len(content) > 400:
+                            content = content[:400] + "..."
+                        
+                        # Kaynak formatını düzelt
+                        if isinstance(source, str):
+                            source_name = source.split('/')[-1] if '/' in source else source
+                            if 'Ä°ZÃ' in source_name or any(char in source_name for char in ['Ã', 'Â']):
+                                source_name = "İZÜ YKS Tercih Rehberi.pdf"
+                        else:
+                            source_name = "Rehber Dokümanı"
+                        
+                        context_parts.append(f"**Kaynak**: {source_name}\n**İçerik**: {content}")
+                        total_chars += len(content)
+                        
+                        logger.info(f"✅ Doküman {i+1}: {source_name} - {len(content)} karakter")
+                        
+                        # Maximum 1200 karakter sınırı
+                        if total_chars > 1200:
+                            break
+                            
+                    except Exception as doc_error:
+                        logger.warning(f"⚠️ Doküman {i+1} işleme hatası: {doc_error}")
                         continue
-                    
-                    # İçeriği kısalt
-                    if len(content) > 300:
-                        content = content[:300] + "..."
-                    
-                    # Kaynak formatını düzelt
-                    source_name = source.split('/')[-1] if '/' in source else source
-                    if 'Ä°ZÃ' in source_name:  # Encoding sorunu
-                        source_name = "İZÜ YKS Tercih Rehberi.pdf"
-                    
-                    context_parts.append(f"**Kaynak**: {source_name}\n**İçerik**: {content}")
-                    total_chars += len(content)
-                    
-                    logger.info(f"✅ Doküman {i+1}: {source_name} - {len(content)} karakter")
-                    
-                    # Maximum 1000 karakter sınırı
-                    if total_chars > 1000:
-                        break
                 
                 if not context_parts:
-                    logger.error("❌ Hiçbir doküman geçerli içerik içermiyor!")
-                    return "Dokümanlar içerik içermiyor"
+                    logger.error("❌ Hiçbir doküman işlenemedi!")
+                    return "Dokümanlar işlenemedi"
                 
                 final_context = "\n\n".join(context_parts)
-                logger.info(f"✅ Vector context hazırlandı: {len(final_context)} karakter")
+                vector_time = time.time() - vector_start
+                
+                logger.info(f"✅ NATIVE VECTOR ARAMA TAMAMLANDI ({vector_time:.2f}s):")
+                logger.info(f"   📄 İşlenen doküman: {len(context_parts)} adet")
+                logger.info(f"   📝 Toplam context: {len(final_context)} karakter")
+                logger.info(f"   📄 Context önizleme: '{final_context[:200]}...'")
+                
                 return final_context
                     
-            except Exception as e:
-                logger.error(f"❌ Vector arama hatası: {e}")
-                return f"Vector arama sırasında hata oluştu"
+            except Exception as search_error:
+                logger.error(f"❌ Vector arama hatası: {search_error}")
+                return "Vector arama başarısız"
             
         except Exception as e:
-            logger.error(f"❌ Vector context genel hatası: {e}")
+            vector_time = time.time() - vector_start
+            logger.error(f"❌ Vector context genel hatası ({vector_time:.2f}s): {e}")
             return "Vector arama genel hatası"
+    
 
     async def _get_csv_context_safe(self, question: str) -> str:
-        """Güvenli CSV analiz - Detaylı logging"""
+        """CSV analiz - HIZLANDIRILMIŞ VE GÜVENLİ VERSİYON"""
         try:
             csv_start = time.time()
             
             if self.csv_data is None:
-                logger.warning("⚠️ CSV verileri mevcut değil")
+                logger.info("❌ CSV verileri mevcut değil")
                 return "CSV verileri mevcut değil"
-            
-            if not self.llm_csv_agent:
-                logger.error("❌ CSV Agent LLM mevcut değil!")
-                return "CSV analizi için gerekli model yüklenmedi"
-            
-            logger.info(f"📊 CSV analiz başlatılıyor: '{question[:50]}...'")
-            
-            # CSV filtreleme logic
-            filter_start = time.time()
+
             question_lower = question.lower()
             
+            # HIZLI ÖN KONTROL - CSV anahtar kelimesi var mı?
+            csv_keywords = [
+                "istihdam", "maaş", "gelir", "sektör", "firma", "çalışma", "iş", 
+                "girişim", "başlama", "oran", "yüzde", "istatistik", "veri",
+                "employment", "salary", "sector", "startup", "rate", "percentage"
+            ]
+            
+            csv_required = any(keyword in question_lower for keyword in csv_keywords)
+            
+            if not csv_required:
+                logger.info("⚡ CSV analizi atlandı - anahtar kelime yok")
+                return "CSV analizi gerekli değil - genel rehberlik sorusu"
+
+            logger.info("📊 CSV analizi gerekli - detaylı analiz başlatılıyor")
+
             # Bölüm adını bul
             bolum_adi = None
             for bolum in self.csv_data['bolum_adi'].unique():
                 if bolum.lower() in question_lower:
                     bolum_adi = bolum
                     break
-            
-            # Metrik analizi
-            metrik_map = {
-                "istihdam": [col for col in self.csv_data.columns if "istihdam" in col],
-                "maaş": [col for col in self.csv_data.columns if col.startswith("maas_")],
-                "firma": [col for col in self.csv_data.columns if col.startswith("firma_")],
-                "girişim": [col for col in self.csv_data.columns if "girisim" in col],
-                "sektör": [col for col in self.csv_data.columns if col.startswith("sektor_")]
-            }
-            
-            metrikler = []
-            detected_topics = []
-            for anahtar, cols in metrik_map.items():
-                if anahtar in question_lower:
-                    metrikler.extend(cols)
-                    detected_topics.append(anahtar)
-            
-            if not metrikler:
-                metrikler = [col for col in self.csv_data.columns if col not in ['bolum_adi', 'gosterge_id', 'bolum_id']]
-                detected_topics = ["genel"]
-            
-            # Filter uygula
-            filtered = self.csv_data
+
+            # Sadece spesifik bölüm sorgusu varsa detaylı analiz
             if bolum_adi:
-                filtered = filtered[filtered['bolum_adi'] == bolum_adi]
-            
-            if filtered.empty:
-                filtered = self.csv_data.head(CSVConfig.SAMPLE_ROWS)
-            
-            selected_cols = ['bolum_adi', 'gosterge_id'] + metrikler[:20]  # Limitle
-            selected = filtered[selected_cols]
-            
-            filter_time = time.time() - filter_start
-            
-            logger.info(f"📊 CSV FİLTRELEME SONUCU ({filter_time:.2f}s):")
-            logger.info(f"   🎯 Tespit edilen bölüm: {bolum_adi or 'Yok'}")
-            logger.info(f"   📈 Tespit edilen konular: {detected_topics}")
-            logger.info(f"   📋 Seçilen metrikler: {len(metrikler)} adet")
-            logger.info(f"   📊 Filtrelenmiş veri: {len(selected)} satır x {len(selected.columns)} kolon")
-            
-            csv_snippet = selected.to_string(index=False)
-            
-            # CSV Agent çağrısı
-            agent_start = time.time()
-            result = await self.llm_csv_agent.ainvoke(
-                self.csv_agent_prompt.format(
-                    question=question,
-                    csv_data=csv_snippet
-                )
-            )
-            
-            analysis = result.content.strip()
-            agent_time = time.time() - agent_start
-            
-            total_time = time.time() - csv_start
-            
-            logger.info(f"✅ CSV AGENT SONUCU ({agent_time:.2f}s):")
-            logger.info(f"   📝 Analiz uzunluğu: {len(analysis)} karakter")
-            logger.info(f"   📄 Analiz özet: '{analysis[:100]}...'")
-            logger.info(f"   ⏱️ Toplam CSV süresi: {total_time:.2f}s")
+                logger.info(f"🎯 Spesifik bölüm bulundu: {bolum_adi}")
+                
+                # Filtreli analiz
+                filtered = self.csv_data[self.csv_data['bolum_adi'] == bolum_adi]
+                
+                if filtered.empty:
+                    logger.warning(f"⚠️ {bolum_adi} için veri bulunamadı")
+                    return f"{bolum_adi} için veri bulunamadı"
+                
+                # İlgili metrikleri belirle
+                metrik_cols = []
+                if any(word in question_lower for word in ["istihdam", "çalışma", "iş", "employment"]):
+                    metrik_cols.extend([col for col in self.csv_data.columns if "istihdam" in col])
+                if any(word in question_lower for word in ["maaş", "gelir", "salary", "wage"]):
+                    metrik_cols.extend([col for col in self.csv_data.columns if col.startswith("maas_")])
+                if any(word in question_lower for word in ["sektör", "sector", "alan"]):
+                    metrik_cols.extend([col for col in self.csv_data.columns if col.startswith("sektor_")])
+                if any(word in question_lower for word in ["firma", "şirket", "company"]):
+                    metrik_cols.extend([col for col in self.csv_data.columns if col.startswith("firma_")])
+                if any(word in question_lower for word in ["girişim", "startup", "entrepreneur"]):
+                    metrik_cols.extend([col for col in self.csv_data.columns if "girisim" in col])
+                    
+                if not metrik_cols:
+                    # Varsayılan metrikler
+                    metrik_cols = ["istihdam_orani", "girisimcilik_orani"]
+                
+                # Küçük veri seti hazırla (ilk 25 metrik)
+                selected_cols = ['bolum_adi', 'gosterge_id'] + metrik_cols[:25]
+                csv_snippet = filtered[selected_cols].to_string(index=False)
+                
+                logger.info(f"📋 Seçilen metrikler: {len(metrik_cols)} adet")
+                
+            else:
+                # Genel sorgu - örnek veri ver
+                logger.info("📈 Genel CSV sorusu - örnek veri kullanılıyor")
+                sample_data = self.csv_data.head(5)[['bolum_adi', 'istihdam_orani', 'girisimcilik_orani']]
+                csv_snippet = sample_data.to_string(index=False)
+
+            # CSV Agent'a sor (güvenli fallback ile)
+            if self.llm_csv_agent:
+                try:
+                    result = await self.llm_csv_agent.ainvoke(
+                        self.csv_agent_prompt.format(
+                            question=question,
+                            csv_data=csv_snippet[:1500]  # 1500 karakter sınırı
+                        )
+                    )
+                    analysis = result.content.strip()
+                    logger.info(f"✅ CSV Agent analiz tamamlandı")
+                except Exception as agent_error:
+                    logger.error(f"❌ CSV Agent hatası: {agent_error}")
+                    analysis = f"CSV analizi sırasında model hatası oluştu. Ham veri: {csv_snippet[:300]}..."
+            else:
+                logger.warning("⚠️ CSV Agent LLM mevcut değil - ham veri döndürülüyor")
+                analysis = f"CSV analizi için model mevcut değil. İlgili veri bulundu: {csv_snippet[:300]}..."
+
+            csv_time = time.time() - csv_start
+            logger.info(f"📄 Analiz özet: '{analysis[:100]}...'")
+            logger.info(f"⏱️ Toplam CSV süresi: {csv_time:.2f}s")
             
             return analysis
-            
-        except Exception as e:
-            total_time = time.time() - csv_start
-            logger.error(f"❌ CSV analiz hatası ({total_time:.2f}s): {e}")
-            return "CSV analizi sırasında hata oluştu"
 
+        except Exception as e:
+            csv_time = time.time() - csv_start
+            logger.error(f"❌ CSV analiz genel hatası ({csv_time:.2f}s): {e}")
+            return "CSV analizi sırasında hata oluştu"
+            
     async def _generate_final_response_safe(self, question: str, context1: str, context2: str, history: str = "") -> str:
         """Güvenli final yanıt oluşturma - Detaylı logging"""
         try:
