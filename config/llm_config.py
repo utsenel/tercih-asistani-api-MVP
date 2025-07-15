@@ -31,7 +31,7 @@ class LLMConfig:
                 "max_tokens": self.max_tokens,
                 "max_retries": self.max_retries,
                 "timeout": self.timeout
-                }
+            
             }
         elif self.provider == LLMProvider.GOOGLE:
             return {
