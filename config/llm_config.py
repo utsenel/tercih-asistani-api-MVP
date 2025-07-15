@@ -23,19 +23,21 @@ class LLMConfig:
     fallback_model: Optional[str] = None
     
     def to_langchain_params(self) -> Dict[str, Any]:
-        """Provider'a göre LangChain parametreleri"""
         if self.provider == LLMProvider.OPENAI:
             return {
                 "api_key": os.getenv("OPENAI_API_KEY"),
                 "model": self.model,
                 "temperature": self.temperature,
                 "max_tokens": self.max_tokens,
-                "max_retries": self.max_retries,
-                "timeout": self.timeout
+                # DEĞIŞEN: max_retries ve timeout'u model_kwargs'a taşındı
+                "model_kwargs": {
+                    "max_retries": self.max_retries,
+                    "timeout": self.timeout
+                }
             }
         elif self.provider == LLMProvider.GOOGLE:
             return {
-                "api_key": os.getenv("GOOGLE_API_KEY"),
+                "google_api_key": os.getenv("GOOGLE_API_KEY"),  # DEĞIŞEN: api_key → google_api_key
                 "model": self.model,
                 "temperature": self.temperature,
                 "max_output_tokens": self.max_tokens,
@@ -48,8 +50,7 @@ class LLMConfig:
                 "model": self.model,
                 "temperature": self.temperature,
                 "max_tokens": self.max_tokens,
-                "max_retries": self.max_retries,
-                "timeout": self.timeout
+                # DEĞIŞEN: max_retries ve timeout kaldırıldı (Claude desteklemiyor)
             }
     
     def get_fallback_config(self):
@@ -109,8 +110,8 @@ class LLMConfigs:
         model="claude-3-5-sonnet-20241022", 
         temperature=0.3, 
         max_tokens=600, 
-        timeout=100,
-        max_retries=2,
+       # timeout=100,
+       # max_retries=2,
         fallback_provider=LLMProvider.OPENAI,
         fallback_model="gpt-4o"
     )
