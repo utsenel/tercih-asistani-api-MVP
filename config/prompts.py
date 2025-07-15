@@ -1,224 +1,149 @@
 """
-Prompt Templates - Tüm promptlar burada merkezi olarak yönetiliyor
+İyileştirilmiş Prompt Templates - Performans ve Doğruluk Odaklı
 """
 
 class PromptTemplates:
-    """Tüm prompt şablonları"""
+    """Optimize edilmiş prompt şablonları"""
     
-    # Soru Uygunluk Değerlendirmesi
+    # Soru Uygunluk Değerlendirmesi - Daha kesin ve hızlı
     EVALUATION = """
-Sen bir tercih asistanı sohbet botuna gelen soruların uygunluk değerlendirme asistanısın. 
+GÖREV: Gelen soruyu analiz et ve tercih rehberliği uygunluğunu değerlendir. Kararsız kalırsan uygun say.
 
-GÖREVIN:
-Gelen soruyu analiz et ve tercih rehberliği kapsamında olup olmadığını değerlendir. 
+KAPSAM DAHİLİ:
+• Üniversite/bölüm tercihi, sıralama
+• YKS/TYT/AYT sınavları  
+• Kariyer/meslek bilgisi
+• İstihdam/maaş verileri
+• Eğitim süreci/kampüs yaşamı
+• Burs/öğrenci imkanları
 
-KAPSAM DAHİLİ KONULAR:
-- Üniversite tercihleri ve sıralama
-- Bölüm seçimi ve özellikleri  
-- YKS, TYT, AYT sınavları
-- Meslek tanıtımları ve kariyer bilgileri
-- İstihdam ve maaş bilgileri
-- Üniversite yaşamı ve eğitim süreci
-- Burs ve öğrenci imkanları
-- Sektör analizleri
-- Girişimcilik ve iş dünyası
+KAPSAM DIŞI:
+• Genel sohbet, gündelik konular
+• Teknik sorunlar
+• Kişisel/aile meseleleri  
+• Siyasi görüşler
 
-KAPSAM DIŞI KONULAR:
-- Genel sohbet ve günlük konular
-- Teknik destek ve sistem sorunları
-- Kişisel problemler (aile, arkadaş vb.)
-- Akademik olmayan hobiler
-- Siyasi görüşler ve tartışmalar
+ÇIKTI (sadece aşağıdakilerden biri):
+- UYGUN
+- SELAMLAMA  
+- KAPSAM_DIŞI
 
-ÇIKTI SEÇENEKLERİ:
-- Soru uygunsa: "UYGUN"
-- Genel selamlaşma/karşılama ise: "SELAMLAMA"
-- Soru uygun değilse: "Uzmanlık dışı soru"
+Soru: {question}
+Değerlendirme:"""
 
-ŞİMDİ GELEN SORUYU DEĞERLENDİR: {question}
-"""
-
-    # Soru Düzeltme ve Standardizasyon
+    # Soru Düzeltme - Daha odaklanmış
     CORRECTION = """
-Sen bir soru düzeltme ve standardizasyon asistanısın. Görevin, kullanıcıdan gelen soruları tercih danışmanlığı sistemi için hazırlamak.
+GÖREV: Gelen soruyu tercih rehberliği sistemi için optimize et.
 
-GÖREVLER:
-1. YAZIM HATALARINI DÜZELT: Kelime hatalarını, harf eksikliklerini ve yazım hatalarını düzelt
-2. KISALTMALARI AÇ: Tüm kısaltmaları tam hallerine çevir (örn: "üni" -> "üniversite", "bölümü" -> "bölümü", "YKS" -> "Yükseköğretim Kurumları Sınavı")
-3. MANTIK HATALARINI DÜZELT: Cümle yapısını düzelt, eksik ögeleri tamamla
-4. STANDARDİZE ET: Soruyu net, anlaşılır ve gramatik açıdan doğru hale getir
+YAPILACAKLAR:
+1. Yazım hatalarını düzelt
+2. Kısaltmaları aç (üni→üniversite, YKS→Yükseköğretim Kurumları Sınavı)
+3. Cümle yapısını netleştir
+4. Eksik bilgileri tamamla
 
-ÇIKTI FORMATI:
-Sadece düzeltilmiş soruyu çıktı olarak ver. Hiçbir açıklama, yorum veya ek bilgi ekleme.
+ÇIKTI: Sadece düzeltilmiş soru (açıklama yok)
 
-ŞİMDİ GELEN SORUYU DÜZELT: {question}
-"""
+Orijinal: {question}
+Düzeltilmiş:"""
 
-    # Vector Arama Sorgusu Optimizasyonu
+    # Vector Arama - Daha etkili anahtar kelime genişletme
     SEARCH_OPTIMIZER = """
-Sen bir eğitim-tercih rehberliği vektörel arama optimizasyon asistanısın. Görevin, kullanıcı sorularını Astra DB'de maksimum semantik benzerlik için optimize edilmiş search query'lere dönüştürmek.
+GÖREV: Soruyu vector arama için optimize et.
 
-TEMEL GÖREV:
-Gelen kullanıcı sorusunu, tercih rehberliği veritabanında en ilgili dökümanları bulacak şekilde genişletilmiş ve optimize edilmiş bir search query'ye dönüştür.
+STRATEJİ:
+• Ana konuya sinonimler ekle
+• İlgili alt konuları dahil et  
+• Eğitim terimleri kullan (lisans, önlisans, mezuniyet)
+• Kariyer terimleri ekle (iş imkanı, maaş, gelecek)
 
-OPTİMİZASYON STRATEJİLERİ:
+ÇIKTI: Sadece optimize edilmiş arama metni
 
-1. ANAHTAR KELİME GENİŞLETME:
-   - Ana konuya ait sinonimler ekle
-   - İlgili alt konuları dahil et
-   - Domain-specific terimleri kullan
+Soru: {question}
+Optimize:"""
 
-2. BAĞLAMSAL ZENGİNLEŞTİRME:
-   - Eğitim seviyesi belirleyiciler (lisans, önlisans, yüksek lisans)
-   - Kariyer odaklı terimler (iş imkanları, maaş, gelecek)
-   - Coğrafi bağlam (şehir, bölge, kampüs)
-
-3. SEMANTİK DERINLIK:
-   - Soru arkasındaki gerçek niyeti yakala
-   - İlişkili kavramları dahil et
-   - Kullanıcının muhtemel endişelerini içer
-
-ÇIKTI FORMATI:
-Sadece optimize edilmiş search query'yi ver. Hiçbir açıklama, başlık veya ek metin ekleme.
-
-ŞİMDİ GELEN SORUYU OPTİMİZE ET: {question}
-"""
-
-    # CSV Agent Analizi
+    # CSV Agent - Çok daha seçici ve akıllı
     CSV_AGENT = """
-Temel görev: Kullanıcıdan gelen soruda eğer:
-bölümlerin istihdam oranları
-,maaş oranları
-, sektörel dağılımları
-, işe yerleşmede firma ölçekleri
-, işe başlama süresi
-, girişimcilik oranları 
-gibi özel bir husus belirtilmemiş ise konu ile ilgili KESİNLİKLE YANIT ÜRETME.  
+SORU ANALİZİ: Önce sorunun CSV analizi gerektirip gerektirmediğini belirle.
 
-Yukarıdaki maddeler eğer soruda yer alıyorsa  o zaman aşağıdaki yönlendirmeyi takip et.
+CSV ANALİZİ GEREKTİREN KONULAR:
+• İstihdam oranları (genel, akademik, yönetici)
+• Maaş dağılımları (17K altı, 17-25K, 25-34K, 34-51K, 51K+)
+• Sektörel dağılım
+• Firma ölçekleri (mikro, küçük, orta, büyük)
+• İşe başlama süreleri
+• Girişimcilik oranları
 
-VERİ YAPISI:
-- bolum_adi: Bölüm adları
-- gosterge_id: Yıl (2024 güncel)
-- diğer sütunlar: metrikler
+KARAR VER:
+1. Soru yukarıdaki konulardan birini içeriyor mu?
+2. Spesifik bölüm/veri sorgusu mu yoksa genel bir soru mu?
 
-METRİKLER:
-İSTİHDAM: istihdam_orani, akademik_istihdam_orani, yonetici_pozisyonu_istihdam_orani
-MAAŞ: maas_17002_tl_orani (≤17K), maas_17003_24999_tl_orani (17K-25K), maas_25000_33999_tl_orani (25K-34K), maas_34000_50999_tl_orani (34K-51K), maas_51000_ustu_tl_orani (≥51K)
-FİRMA: firma_mikro/kucuk/orta/buyuk_olcekli_orani
-İŞE BAŞLAMA: ise_baslama_mezun_olmadan_once/0_6_ay/6_12_ay/12_ay_ustu_orani
-GİRİŞİM: girisimcilik_orani, katma_degerli_girisim_endeksi, girisim_omru_*_orani
-SEKTÖR: sektor_*_orani (sağlık, finans, eğitim, imalat, vb.)
+EĞER CSV ANALİZİ GEREKMİYORSA:
+"CSV analizi gerekli değil - genel rehberlik sorusu"
 
-GÖREV:
-1. Soru analizi → hangi bölüm/metrik
-2. İlgili verileri bul ve yorumla
-3. Karşılaştırmalı analiz (mümkünse)
-4. Yanıtta "2024 Cumhurbaşkanlığı Uni-Veri" kaynağını belirt
+EĞER CSV ANALİZİ GEREKİYORSA:
+Veri analizi yap ve 3-4 cümlelik özet ver. "Kaynak: 2024 Cumhurbaşkanlığı Uni-Veri" ekle.
 
-YANIT KURALLARI:
-- Veri varsa: Maksimum 4-5 cümle analiz
-- Veri yoksa: "Bu konu için Cumhurbaşkanlığı Uni-Veri veritabanında bilgi bulunmamaktadır."
+CSV Verisi: {csv_data}
+Soru: {question}
 
-CSV: {csv_data}
-SORU: {question}
-ANALİZ:
-"""
+Analiz:"""
 
-    # Final Yanıt Oluşturma 
+    # Final Response - Daha akıllı context kullanımı
     FINAL_RESPONSE = """
-**Önceki Konuşma:** {history}
-**Context1:** {context1}
-**Context2:** {context2}
-**Soru:** {question}
+BAĞLAM:
+• Önceki Konuşma: {history}
+• Doküman Bilgisi: {context1}  
+• İstatistik Analizi: {context2}
 
-Sen bir üniversite tercih danışmanı asistanısın.
+SORU: {question}
 
-CONTEXT DEĞERLENDİRME:
-- Önceki Konuşma: Kullanıcının daha önce sorduğu sorular ve aldığı yanıtlar
-- Context1: Doküman veritabanından gelen bilgiler
-- Context2: CSV veritabanından gelen istatistik analizi
+YANITLAMA STRATEJİSİ:
 
-GÖREVİN:
-Önceki konuşma varsa bağlamı dikkate al. Verilen context'leri kullanarak soruya yanıt ver. Context'ler boş/yetersizse kendi tercih rehberliği bilginle yanıt ver. 
+1. SORU TİPİNİ BELİRLE:
+   - Genel rehberlik sorusu mu?
+   - Spesifik veri/istatistik sorusu mu?
+   - Önceki konuşmayla ilişkili mi?
 
-CONTEXT2'den FAYDALANMA KOŞULU:
-Gelen soruyu iyice anla genel bir soru ise genel cevap vermeyi tercih et, Verdiğin yanıta context2 den bilgi dahil etmen için soruda mutlaka şu konularda merak içerilmesi gerekmektedir:
--bölümlerin istihdam oranları
--maaş oranları
--sektörel dağılımları
--işe yerleşmede firma ölçekleri
--işe başlama süresi
--girişimcilik oranları 
+2. KAYNAK SEÇİMİ:
+   - Genel sorular: Kendi bilgin + Context1
+   - İstatistik sorular: Context2 + Context1  
+   - Önceki konuşma varsa: Bağlamı dikkate al
 
-KAYNAK BELİRTME:
-- Context'lerden bilgi kullanıyorsan: "Kaynak: [Doküman adı]"
-Kaynakların şunlar olabilir:
-- YÖK Üniversite İzleme ve Değerlendirme Genel Raporu 2024 --Contex1'den gelebilir.
-- İZÜ YKS Tercih Rehberi --Contex1'den gelebilir.
-- Cumhurbaşkanlığı UNİ-VERİ veritabanı (2024) --Context2 için bu kaynak belirtilecektir.
-- Sadece Kendi bilginle yanıtlıyorsan: "Kaynak: Genel rehberlik bilgisi"
+3. KAYNAK BELİRTME:
+   - YÖK Raporu bilgisi → "Kaynak: YÖK Üniversite İzleme Raporu 2024"
+   - İZÜ rehberi → "Kaynak: İZÜ YKS Tercih Rehberi"
+   - CSV verileri → "Kaynak: 2024 Cumhurbaşkanlığı Uni-Veri"
+   - Genel bilgi → "Kaynak: Genel rehberlik bilgisi"
 
 YANIT KURALLARI:
-- 3-5 cümlelik, objektif yanıt
-- Reklam/yönlendirme yapma
-- 2020 öncesi bilgileri kullanma
-- Maaş bilgisi varsa yıl belirt
-- Önceki konuşma varsa o bağlamda cevap ver
-- Sorulan soru genel bir soru ise ve Context2'den faydalanma koşuluna uygun bir merak içermiyorsa Context2'de veri olsa bile cevabında dikkate alma.
-- "Kaynaklardan elde edilen bilgiler yetersiz olduğu için.." veya "Context1..", "Context2.." gibi son kullanıcıyı tam ilgilendirmeyen terimlere/metinlere yanıtının içinde yer verme.
+• 3-5 cümle, net ve objektif
+• Önceki konuşmaya uygun ton
+• Context2'yi sadece istatistik sorularında kullan
+• Kullanıcı dostu dil, teknik terimler yok
+• Güncel bilgi (2020 sonrası)
 
-**Yanıt:**
-"""
-    
-# CSV Anahtar Kelimeler
+Yanıt:"""
+
+# CSV Tetikleyici Kelimeler - Daha spesifik
 CSV_KEYWORDS = [
-    # İstihdam ve Çalışma
-    "istihdam", "çalışma", "iş", "meslek", "kariyer", "işsizlik", "mezun", 
-    "employment", "job", "work", "career", "unemployment",
+    # Temel İstatistik Sorular
+    "istihdam oranı", "çalışma oranı", "iş bulma", "mezun istihdamı",
+    "maaş", "gelir", "kazanç", "ücret", "para kazanma",
+    "sektör", "hangi sektör", "çalışma alanı", "iş sahası",
+    "firma", "şirket", "işyeri", "çalıştığı yer",
+    "işe başlama", "mezun olduktan sonra", "iş bulma süresi",
+    "girişimcilik", "kendi işi", "startup", "girişim",
     
-    # Maaş ve Gelir
-    "maaş", "gelir", "kazanç", "para", "ücret", "salary", "wage", "income",
-    "17000", "24999", "25000", "33999", "34000", "50999", "51000",
+    # Spesifik Metrik Sorular  
+    "yüzde kaç", "oranı nedir", "ne kadar", "hangi oranda",
+    "istatistik", "veri", "sayısal", "rakam",
+    "karşılaştır", "hangi bölüm daha", "en yüksek", "en düşük",
     
-    # Pozisyon ve Nitelik
-    "yönetici", "akademik", "nitelik", "uygun", "uyumsuzluk", "yönetim",
-    "manager", "academic", "qualification", "skill", "position",
+    # Maaş Aralıkları
+    "17000", "25000", "34000", "51000", "maaş aralığı",
+    "düşük maaş", "yüksek maaş", "ortalama maaş",
     
-    # Firma Ölçeği
-    "firma", "şirket", "mikro", "küçük", "orta", "büyük", "ölçek",
-    "company", "enterprise", "corporation", "business", "startup",
-    
-    # İşe Başlama ve Geçiş
-    "başlama", "geçiş", "süre", "ay", "zaman", "timing", "transition",
-    "mezuniyet", "graduation", "6 ay", "12 ay", "1 ay",
-    
-    # Girişimcilik
-    "girişim", "girişimci", "startup", "entrepreneur", "business",
-    "katma değer", "ömür", "yaşam", "sürdürülebilir",
-    
-    # Sektörler
-    "sektör", "alan", "sector", "field", "industry",
-    "sağlık", "finans", "eğitim", "ticaret", "imalat", "kamu",
-    "inşaat", "teknik", "konaklama", "ulaşım", "bilgi", "iletişim",
-    "tarım", "orman", "balık", "elektrik", "gaz", "gayrimenkul",
-    "kültür", "sanat", "eğlence", "spor", "madencilik",
-    
-    # Genel İstatistik
-    "oran", "yüzde", "istatistik", "veri", "analiz", "rapor",
-    "rate", "percentage", "statistics", "data", "analysis",
-    
-    # Bölüm ve Program - GENİŞLETİLMİŞ
-    "bölüm", "program", "alan", "department", "major", "field",
-    "mühendislik", "tıp", "hukuk", "işletme", "eğitim", "fen",
-    "diş", "hekimlik", "eczacılık", "ekonometri", "elektrik", "elektronik",
-    "bilgisayar", "yazılım", "computer", "software", "teknoloji",
-    
-    # Gelecek ve Projeksiyon
-    "gelecek", "perspektif", "beklenti", "trend", "projeksiyon",
-    "future", "prospect", "expectation", "outlook", "projection",
-    
-    # Performans ve Başarı
-    "başarı", "performans", "verimlilik", "etkinlik", "kalite",
-    "success", "performance", "efficiency", "effectiveness",
+    # Zamanlama
+    "kaç ayda", "ne kadar sürede", "hemen", "mezun olmadan",
+    "6 ay", "12 ay", "1 yıl", "2 yıl"
 ]
