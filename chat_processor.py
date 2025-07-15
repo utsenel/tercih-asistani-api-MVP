@@ -68,7 +68,8 @@ class TercihAsistaniProcessor:
             logger.info(f"   OPENAI_API_KEY: {'✅ Set' if os.getenv('OPENAI_API_KEY') else '❌ Missing'}")
             logger.info(f"   ANTHROPIC_API_KEY: {'✅ Set' if os.getenv('ANTHROPIC_API_KEY') else '❌ Missing'}")
             logger.info(f"   GOOGLE_API_KEY: {'✅ Set' if os.getenv('GOOGLE_API_KEY') else '❌ Missing'}")
-  
+            
+            logger.info(f"   ANTHROPIC_API_KEY: {os.getenv('ANTHROPIC_API_KEY')}")
             # Multi-provider LLM'leri başlat
             self.llm_evaluation = LLMFactory.create_llm(LLMConfigs.EVALUATION)
             self.llm_correction = LLMFactory.create_llm(LLMConfigs.CORRECTION)
