@@ -722,41 +722,58 @@ class TercihAsistaniProcessor:
             return {"status": "error", "message": str(e)}
 
     async def _get_csv_context_safe(self, question: str) -> str:
-        """CSV analiz - HIZLANDIRILMIŞ VE GÜVENLİ VERSİYON"""
+        """CSV analiz - HIZLANDIRILMIŞ VE GÜVENLİ VERSİYON + DEBUG"""
         try:
             csv_start = time.time()
             
             if self.csv_data is None:
                 logger.info("❌ CSV verileri mevcut değil")
                 return "CSV verileri mevcut değil"
-
+    
             question_lower = question.lower()
+            logger.info(f"🔍 CSV DEBUG - Gelen soru: '{question_lower}'")
             
             # HIZLI ÖN KONTROL - CSV anahtar kelimesi var mı?
             csv_keywords = [
                 "istihdam", "maaş", "gelir", "sektör", "firma", "çalışma", "iş", 
                 "girişim", "başlama", "oran", "yüzde", "istatistik", "veri",
-                "employment", "salary", "sector", "startup", "rate", "percentage"
+                "employment", "salary", "sector", "startup", "rate", "percentage",
+                # BÖLÜM ADLARI DA EKLENMELI - ÖNEMLİ!
+                "bilgisayar", "mühendislik", "tıp", "hukuk", "ekonomi", "matematik",
+                "fizik", "kimya", "makine", "elektrik", "endüstri"
             ]
             
             csv_required = any(keyword in question_lower for keyword in csv_keywords)
+            logger.info(f"🔍 CSV Keywords check: {csv_required}")
             
             if not csv_required:
                 logger.info("⚡ CSV analizi atlandı - anahtar kelime yok")
                 return "CSV analizi gerekli değil - genel rehberlik sorusu"
-
+    
             logger.info("📊 CSV analizi gerekli - detaylı analiz başlatılıyor")
-
-            # Bölüm adını bul
+    
+            # Bölüm adını bul - İYİLEŞTİRİLMİŞ MATCHING
             bolum_adi = None
+            
+            # Önce tam eşleşme ara
             for bolum in self.csv_data['bolum_adi'].unique():
                 if bolum.lower() in question_lower:
                     bolum_adi = bolum
+                    logger.info(f"🎯 TAM EŞLEŞME bulundu: {bolum_adi}")
                     break
-
-            # Sadece spesifik bölüm sorgusu varsa detaylı analiz
+            
+            # Tam eşleşme yoksa kısmi eşleşme ara
+            if not bolum_adi:
+                for bolum in self.csv_data['bolum_adi'].unique():
+                    bolum_words = bolum.lower().split()
+                    if any(word in question_lower for word in bolum_words if len(word) > 3):
+                        bolum_adi = bolum
+                        logger.info(f"🎯 KISMI EŞLEŞME bulundu: {bolum_adi}")
+                        break
+    
+            # Spesifik bölüm sorgusu varsa detaylı analiz
             if bolum_adi:
-                logger.info(f"🎯 Spesifik bölüm bulundu: {bolum_adi}")
+                logger.info(f"📋 Spesifik bölüm analizi: {bolum_adi}")
                 
                 # Filtreli analiz
                 filtered = self.csv_data[self.csv_data['bolum_adi'] == bolum_adi]
@@ -765,59 +782,88 @@ class TercihAsistaniProcessor:
                     logger.warning(f"⚠️ {bolum_adi} için veri bulunamadı")
                     return f"{bolum_adi} için veri bulunamadı"
                 
-                # İlgili metrikleri belirle
+                # İlgili metrikleri belirle - GENİŞLETİLMİŞ
                 metrik_cols = []
+                
+                # Her durumda temel metrikleri ekle
+                temel_metrikler = ["istihdam_orani", "girisimcilik_orani", "ortalama_calisma_suresi_ay"]
+                metrik_cols.extend(temel_metrikler)
+                
+                # Spesifik anahtar kelimelere göre ek metrikler
                 if any(word in question_lower for word in ["istihdam", "çalışma", "iş", "employment"]):
                     metrik_cols.extend([col for col in self.csv_data.columns if "istihdam" in col])
+                    logger.info("📊 İstihdam metrikleri eklendi")
+                    
                 if any(word in question_lower for word in ["maaş", "gelir", "salary", "wage"]):
                     metrik_cols.extend([col for col in self.csv_data.columns if col.startswith("maas_")])
+                    logger.info("💰 Maaş metrikleri eklendi")
+                    
                 if any(word in question_lower for word in ["sektör", "sector", "alan"]):
                     metrik_cols.extend([col for col in self.csv_data.columns if col.startswith("sektor_")])
+                    logger.info("🏢 Sektör metrikleri eklendi")
+                    
                 if any(word in question_lower for word in ["firma", "şirket", "company"]):
                     metrik_cols.extend([col for col in self.csv_data.columns if col.startswith("firma_")])
+                    logger.info("🏭 Firma metrikleri eklendi")
+                    
                 if any(word in question_lower for word in ["girişim", "startup", "entrepreneur"]):
                     metrik_cols.extend([col for col in self.csv_data.columns if "girisim" in col])
-                    
-                if not metrik_cols:
-                    # Varsayılan metrikler
-                    metrik_cols = ["istihdam_orani", "girisimcilik_orani"]
+                    logger.info("🚀 Girişimcilik metrikleri eklendi")
                 
-                # Küçük veri seti hazırla (ilk 25 metrik)
-                selected_cols = ['bolum_adi', 'gosterge_id'] + metrik_cols[:25]
+                # Duplicate'ları temizle ve maksimum 30 metrik
+                metrik_cols = list(dict.fromkeys(metrik_cols))[:30]
+                logger.info(f"📋 Final metrik sayısı: {len(metrik_cols)}")
+                
+                # Küçük veri seti hazırla
+                selected_cols = ['bolum_adi', 'gosterge_id'] + metrik_cols
                 csv_snippet = filtered[selected_cols].to_string(index=False)
                 
-                logger.info(f"📋 Seçilen metrikler: {len(metrik_cols)} adet")
-                
+                logger.info(f"📄 CSV snippet hazırlandı: {len(csv_snippet)} karakter")
+    
             else:
-                # Genel sorgu - örnek veri ver
-                logger.info("📈 Genel CSV sorusu - örnek veri kullanılıyor")
-                sample_data = self.csv_data.head(5)[['bolum_adi', 'istihdam_orani', 'girisimcilik_orani']]
-                csv_snippet = sample_data.to_string(index=False)
-
-            # CSV Agent'a sor (güvenli fallback ile)
+                # Genel sorgu - top 5 bölüm göster
+                logger.info("📈 Genel CSV sorusu - top bölümler gösteriliyor")
+                
+                # İstihdam oranına göre top 5 bölüm
+                top_bolumler = self.csv_data.nlargest(5, 'istihdam_orani')
+                sample_cols = ['bolum_adi', 'istihdam_orani', 'girisimcilik_orani', 'ortalama_calisma_suresi_ay']
+                csv_snippet = top_bolumler[sample_cols].to_string(index=False)
+                logger.info("📊 Top 5 bölüm analizi hazırlandı")
+    
+            # CSV Agent'a sor - GELİŞTİRİLMİŞ ERROR HANDLING
             if self.llm_csv_agent:
                 try:
+                    logger.info(f"🤖 CSV Agent'a gönderiliyor: {len(csv_snippet)} karakter snippet")
+                    
                     result = await self.llm_csv_agent.ainvoke(
                         self.csv_agent_prompt.format(
                             question=question,
-                            csv_data=csv_snippet[:1500]  # 1500 karakter sınırı
+                            csv_data=csv_snippet[:2000]  # 2000 karakter sınırı
                         )
                     )
                     analysis = result.content.strip()
-                    logger.info(f"✅ CSV Agent analiz tamamlandı")
+                    
+                    logger.info(f"✅ CSV Agent analiz tamamlandı: {len(analysis)} karakter")
+                    logger.info(f"📄 Analiz önizleme: '{analysis[:150]}...'")
+                    
+                    # Boş veya çok kısa yanıt kontrolü
+                    if len(analysis) < 20:
+                        logger.warning("⚠️ CSV Agent çok kısa yanıt verdi")
+                        analysis = f"CSV analizi tamamlandı. {bolum_adi or 'İlgili bölümler'} için temel veriler mevcut: {csv_snippet[:200]}..."
+                        
                 except Exception as agent_error:
                     logger.error(f"❌ CSV Agent hatası: {agent_error}")
-                    analysis = f"CSV analizi sırasında model hatası oluştu. Ham veri: {csv_snippet[:300]}..."
+                    analysis = f"CSV analizi sırasında model hatası oluştu. Ham veri bulundu: {csv_snippet[:300]}..."
             else:
                 logger.warning("⚠️ CSV Agent LLM mevcut değil - ham veri döndürülüyor")
                 analysis = f"CSV analizi için model mevcut değil. İlgili veri bulundu: {csv_snippet[:300]}..."
-
+    
             csv_time = time.time() - csv_start
-            logger.info(f"📄 Analiz özet: '{analysis[:100]}...'")
             logger.info(f"⏱️ Toplam CSV süresi: {csv_time:.2f}s")
+            logger.info(f"📊 Final analiz: {len(analysis)} karakter")
             
             return analysis
-
+    
         except Exception as e:
             csv_time = time.time() - csv_start
             logger.error(f"❌ CSV analiz genel hatası ({csv_time:.2f}s): {e}")
