@@ -434,7 +434,7 @@ class TercihAsistaniProcessor:
             return question
 
     async def _get_vector_context_native(self, question: str) -> str:
-        """Native Astrapy API ile vector search - Detaylı logging"""
+    """Native Astrapy API ile vector search - Fixed parsing"""
         try:
             vector_start = time.time()
             
@@ -471,16 +471,52 @@ class TercihAsistaniProcessor:
                 logger.warning("⚠️ Hiç doküman bulunamadı")
                 return "İlgili doküman bulunamadı"
             
-            # Context oluştur ve detaylarını logla
+            # Context oluştur - ASTRAPY PARSING FIX
             context = ""
             for i, doc in enumerate(docs):
-                # Astrapy'da metadata yapısı
-                file_path = doc.get('metadata', {}).get('file_path', doc.get('file_path', 'Bilinmeyen kaynak'))
-                content = doc.get('content', doc.get('text', str(doc)))[:500]
-                context += f"Dosya: {file_path}\nİçerik: {content}\n\n"
-                
-                logger.info(f"   📄 Doküman {i+1}: {file_path}")
-                logger.info(f"       İçerik özet: '{content[:80]}...'")
+                try:
+                    # Astrapy response structure debug
+                    logger.info(f"   🔍 Doc {i+1} structure: {list(doc.keys())}")
+                    
+                    # Multiple parsing attempts
+                    file_path = "Bilinmeyen kaynak"
+                    content = ""
+                    
+                    # Method 1: Direct fields
+                    if 'file_path' in doc:
+                        file_path = doc['file_path']
+                    elif 'metadata' in doc and isinstance(doc['metadata'], dict):
+                        file_path = doc['metadata'].get('file_path', file_path)
+                    
+                    # Content parsing - multiple attempts
+                    if 'content' in doc:
+                        content = doc['content']
+                    elif 'text' in doc:
+                        content = doc['text']
+                    elif '$vectorize' in doc:
+                        content = doc['$vectorize']
+                    else:
+                        # Last resort - convert doc to string and extract
+                        content = str(doc)
+                        # Try to extract meaningful content from string representation
+                        if "'content':" in content:
+                            import re
+                            match = re.search(r"'content':\s*'([^']+)'", content)
+                            if match:
+                                content = match.group(1)
+                    
+                    # Truncate content
+                    content = str(content)[:500]
+                    
+                    context += f"Dosya: {file_path}\nİçerik: {content}\n\n"
+                    
+                    logger.info(f"   📄 Doküman {i+1}: {file_path}")
+                    logger.info(f"       İçerik uzunluğu: {len(content)}")
+                    logger.info(f"       İçerik özet: '{content[:80]}...'")
+                    
+                except Exception as parse_error:
+                    logger.error(f"   ❌ Doküman {i+1} parse hatası: {parse_error}")
+                    context += f"Dosya: Parse hatası\nİçerik: Doküman okunamadı\n\n"
             
             total_time = time.time() - vector_start
             logger.info(f"✅ Vector context hazır: {len(context)} karakter (toplam {total_time:.2f}s)")
