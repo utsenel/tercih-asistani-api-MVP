@@ -907,36 +907,82 @@ class TercihAsistaniProcessor:
             return "Yanıt oluşturulurken hata oluştu. Lütfen tekrar deneyin."
 
     def _extract_sources(self, context1: str, context2: str) -> List[str]:
-        """Kaynaklarını çıkar - Detaylı logging ile"""
+        """Kaynaklarını çıkar - DÜZELTILMIŞ VERSİYON"""
         sources = []
         
         logger.info(f"🔍 KAYNAK ÇIKARIMI:")
+        logger.info(f"   📄 Context1 (Vector): {len(context1)} karakter")
+        logger.info(f"   📊 Context2 (CSV): {len(context2)} karakter")
         
-        # Context1 (Vector) kaynak kontrolü
-        if "Dosya:" in context1 and "bulunamadı" not in context1 and "başarısız" not in context1:
-            sources.append(MessageSettings.SOURCES["YOK_REPORT"])
-            sources.append(MessageSettings.SOURCES["IZU_GUIDE"])
-            logger.info(f"   📄 Vector kaynakları eklendi: YÖK Raporu, İZÜ Rehberi")
+        # Context1 (Vector) kaynak kontrolü - İYİLEŞTİRİLMİŞ LOGIC
+        if context1 and len(context1.strip()) > 50:  # Minimum content check
+            # Hata mesajları kontrolü
+            error_keywords = [
+                "bulunamadı", "başarısız", "mevcut değil", "hata", 
+                "işlenemedi", "sorunu", "genel hatası"
+            ]
+            
+            has_error = any(keyword in context1.lower() for keyword in error_keywords)
+            
+            if not has_error:
+                # Başarılı vector content var
+                if "İZÜ" in context1 or "tercih rehberi" in context1.lower():
+                    sources.append(MessageSettings.SOURCES["IZU_GUIDE"])
+                    logger.info(f"   📄 İZÜ Rehberi kaynağı eklendi")
+                
+                if "yök" in context1.lower() or "üniversite izleme" in context1.lower():
+                    sources.append(MessageSettings.SOURCES["YOK_REPORT"])
+                    logger.info(f"   📄 YÖK Raporu kaynağı eklendi")
+                
+                # Genel vector content varsa en azından genel kaynak ekle
+                if not sources:
+                    sources.append(MessageSettings.SOURCES["IZU_GUIDE"])  # Default vector source
+                    logger.info(f"   📄 Vector content var - İZÜ Rehberi (default) eklendi")
+            else:
+                logger.info(f"   ❌ Vector content'te hata mesajı var: '{context1[:100]}...'")
         else:
-            logger.info(f"   ❌ Vector kaynak bulunamadı")
+            logger.info(f"   ❌ Vector content çok kısa veya boş")
         
-        # Context2 (CSV) kaynak kontrolü
-        if (context2 and 
-            "mevcut değil" not in context2 and 
-            "hata" not in context2 and 
-            "başarısız" not in context2 and
-            len(context2.strip()) > 50):  # Minimum content check
-            sources.append(MessageSettings.SOURCES["UNIVERI_DB"])
-            logger.info(f"   📊 CSV kaynağı eklendi: UNİ-VERİ DB")
+        # Context2 (CSV) kaynak kontrolü - İYİLEŞTİRİLMİŞ LOGIC
+        if context2 and len(context2.strip()) > 50:  # Minimum content check
+            # Hata mesajları kontrolü
+            csv_error_keywords = [
+                "mevcut değil", "hata", "başarısız", "gerekli değil", 
+                "model mevcut değil", "analizi sırasında hata"
+            ]
+            
+            has_csv_error = any(keyword in context2.lower() for keyword in csv_error_keywords)
+            
+            if not has_csv_error:
+                # Başarılı CSV analizi var mı kontrol et
+                csv_success_indicators = [
+                    "analiz", "oran", "veri", "sonuç", "bölüm", 
+                    "istihdam", "maaş", "sektör", "%"
+                ]
+                
+                has_csv_content = any(indicator in context2.lower() for indicator in csv_success_indicators)
+                
+                if has_csv_content:
+                    sources.append(MessageSettings.SOURCES["UNIVERI_DB"])
+                    logger.info(f"   📊 CSV kaynağı eklendi: UNİ-VERİ DB")
+                else:
+                    logger.info(f"   ⚠️ CSV content var ama analiz içeriği belirsiz")
+            else:
+                logger.info(f"   ❌ CSV content'te hata mesajı: '{context2[:100]}...'")
         else:
-            logger.info(f"   ❌ CSV kaynak bulunamadı")
+            logger.info(f"   ❌ CSV content çok kısa veya boş")
         
         # Kaynak yoksa genel kaynak ekle
         if not sources:
             sources.append(MessageSettings.SOURCES["GENERAL"])
-            logger.info(f"   📝 Genel kaynak eklendi")
+            logger.info(f"   📝 Hiç kaynak bulunamadı - Genel kaynak eklendi")
         
-        logger.info(f"   ✅ Toplam kaynak sayısı: {len(sources)}")
+        # Duplicate source'ları temizle
+        sources = list(dict.fromkeys(sources))
+        
+        logger.info(f"   ✅ Final kaynak sayısı: {len(sources)}")
+        for i, source in enumerate(sources, 1):
+            logger.info(f"      {i}. {source}")
         
         return sources
 
