@@ -4,14 +4,13 @@ import re
 from typing import Dict, Any, List
 import logging
 from langchain_openai import ChatOpenAI
-from langchain_astradb import AstraDBVectorStore
 from langchain_core.prompts import ChatPromptTemplate
 import math
 import json
 import asyncio
 import re
 from astrapy import DataAPIClient
-from langchain_openai import OpenAIEmbeddings
+from openai import OpenAI
 from memory import ConversationMemory
 from langchain_anthropic import ChatAnthropic
 
@@ -50,7 +49,7 @@ class LLMFactory:
 
 class TercihAsistaniProcessor:
     """
-    Hata düzeltmeleri ve performans iyileştirmeleri ile güncellenmiş processor
+    Astrapy native API ile güncellenmiş processor
     """
     
     def __init__(self):
@@ -59,7 +58,12 @@ class TercihAsistaniProcessor:
         self.llm_search_optimizer = None
         self.llm_csv_agent = None
         self.llm_final = None
-        self.vectorstore = None
+        
+        # YENİ: Astrapy native components
+        self.openai_client = None
+        self.astra_database = None
+        self.astra_collection = None
+        
         self.csv_data = None
         self.memory = ConversationMemory() 
         
@@ -70,6 +74,18 @@ class TercihAsistaniProcessor:
         self.csv_agent_prompt = ChatPromptTemplate.from_template(PromptTemplates.CSV_AGENT)
         self.final_prompt = ChatPromptTemplate.from_template(PromptTemplates.FINAL_RESPONSE)
 
+    def get_embedding(self, text: str) -> List[float]:
+        """OpenAI embedding oluştur"""
+        try:
+            response = self.openai_client.embeddings.create(
+                input=text,
+                model="text-embedding-3-small"
+            )
+            return response.data[0].embedding
+        except Exception as e:
+            logger.error(f"❌ Embedding oluşturma hatası: {e}")
+            raise
+
     async def initialize(self):
         """Gelişmiş hata yönetimi ile başlatma"""
         try:
@@ -78,11 +94,14 @@ class TercihAsistaniProcessor:
             # API Key kontrolü
             self._check_api_keys()
             
+            # OpenAI client'ı başlat
+            self._initialize_openai_client()
+            
             # LLM'leri sıralı başlat (fallback ile)
             await self._initialize_llms()
             
-            # AstraDB bağlantısı
-            await self._initialize_astradb()
+            # AstraDB bağlantısını native API ile başlat
+            await self._initialize_astradb_native()
             
             # CSV verilerini yükle
             await self._initialize_csv()
@@ -111,6 +130,15 @@ class TercihAsistaniProcessor:
         # Critical keys check
         if not keys["OPENAI_API_KEY"]:
             raise ValueError("OPENAI_API_KEY zorunlu!")
+
+    def _initialize_openai_client(self):
+        """OpenAI client'ı başlat"""
+        try:
+            self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            logger.info("✅ OpenAI client başlatıldı")
+        except Exception as e:
+            logger.error(f"❌ OpenAI client hatası: {e}")
+            raise
 
     async def _initialize_llms(self):
         """Fallback stratejisi ile LLM'leri başlat"""
@@ -143,39 +171,34 @@ class TercihAsistaniProcessor:
                         logger.error(f"❌ {name} fallback hatası: {fb_error}")
                         setattr(self, f"llm_{name}", None)
 
-    async def _initialize_astradb(self):
-        """AstraDB bağlantısını başlat - Basitleştirilmiş"""
+    async def _initialize_astradb_native(self):
+        """AstraDB native API ile bağlantı"""
         try:
-            logger.info("🔌 AstraDB bağlantısı başlatılıyor...")
+            logger.info("🔌 AstraDB native API bağlantısı başlatılıyor...")
             
-            # OpenAI Embeddings - DEĞIŞEN: dimensions parametresi kaldırıldı
-            embedding = OpenAIEmbeddings(
-                model="text-embedding-3-small",
-                openai_api_key=os.getenv("OPENAI_API_KEY")
-            )
-            logger.info("✅ Embedding oluşturuldu")
-    
-            # DEĞIŞEN: content_field ve diğer field mapping parametreleri kaldırıldı
-            self.vectorstore = AstraDBVectorStore(
-                token=DatabaseSettings.ASTRA_DB_TOKEN,
-                api_endpoint=DatabaseSettings.ASTRA_DB_API_ENDPOINT,
-                collection_name=DatabaseSettings.ASTRA_DB_COLLECTION,
-                embedding=embedding
+            # Astra client oluştur
+            astra_client = DataAPIClient(DatabaseSettings.ASTRA_DB_TOKEN)
+            
+            # Database bağlantısı
+            self.astra_database = astra_client.get_database(
+                DatabaseSettings.ASTRA_DB_API_ENDPOINT
             )
             
-            logger.info("✅ AstraDB VectorStore başarıyla oluşturuldu!")
-    
-            # Test arama
-            test_docs = self.vectorstore.similarity_search("test", k=1)
-            logger.info(f"✅ Test arama başarılı: {len(test_docs)} doküman bulundu")
-    
+            # Collection al
+            collection_name = DatabaseSettings.ASTRA_DB_COLLECTION
+            self.astra_collection = self.astra_database.get_collection(collection_name)
+            
+            logger.info(f"✅ AstraDB native bağlantısı başarılı - Collection: {collection_name}")
+            
+            # Test sorgusu
+            test_results = list(self.astra_collection.find({}, limit=1))
+            logger.info(f"✅ Test sorgusu başarılı: {len(test_results)} doküman bulundu")
+            
         except Exception as e:
-            logger.error(f"❌ AstraDB bağlantı hatası: {e}")
-            self.vectorstore = None
+            logger.error(f"❌ AstraDB native bağlantı hatası: {e}")
+            self.astra_database = None
+            self.astra_collection = None
 
-
-
-    
     async def _initialize_csv(self):
         """CSV verilerini güvenli yükle"""
         try:
@@ -235,7 +258,7 @@ class TercihAsistaniProcessor:
             
             # Adım 4: Paralel işlemler (hata toleranslı)
             context1, context2 = await asyncio.gather(
-                self._get_vector_context_safe(corrected_question),
+                self._get_vector_context_native(corrected_question),
                 self._get_csv_context_safe(corrected_question),
                 return_exceptions=True
             )
@@ -315,11 +338,11 @@ class TercihAsistaniProcessor:
             logger.error(f"❌ Düzeltme hatası: {e}")
             return question
 
-    async def _get_vector_context_safe(self, question: str) -> str:
-        """Güvenli vector context"""
+    async def _get_vector_context_native(self, question: str) -> str:
+        """Native Astrapy API ile vector search"""
         try:
-            if not self.vectorstore:
-                logger.warning("Vector store mevcut değil")
+            if not self.astra_collection:
+                logger.warning("Astra collection mevcut değil")
                 return "Vector arama mevcut değil"
                 
             # Query optimization (güvenli)
@@ -334,11 +357,20 @@ class TercihAsistaniProcessor:
                 except Exception as e:
                     logger.warning(f"Query optimization hatası: {e}")
             
-            # Vector arama
-            docs = self.vectorstore.similarity_search(
-                optimized_text, 
-                k=VectorConfig.SIMILARITY_TOP_K
+            # Embedding oluştur
+            query_embedding = self.get_embedding(optimized_text)
+            logger.info(f"✅ Query embedding oluşturuldu: {len(query_embedding)} boyut")
+            
+            # Native vector search
+            results = self.astra_collection.find(
+                {},
+                sort={"$vector": query_embedding},
+                limit=VectorConfig.SIMILARITY_TOP_K
             )
+            
+            # Sonuçları işle
+            docs = list(results)
+            logger.info(f"✅ Vector search sonuç: {len(docs)} doküman bulundu")
             
             if not docs:
                 return "İlgili doküman bulunamadı"
@@ -346,15 +378,16 @@ class TercihAsistaniProcessor:
             # Context oluştur
             context = ""
             for i, doc in enumerate(docs):
-                file_path = doc.metadata.get('file_path', 'Bilinmeyen kaynak')
-                content = doc.page_content[:500]
+                # Astrapy'da metadata farklı yapıda olabilir
+                file_path = doc.get('metadata', {}).get('file_path', doc.get('file_path', 'Bilinmeyen kaynak'))
+                content = doc.get('content', doc.get('text', str(doc)))[:500]
                 context += f"Dosya: {file_path}\nİçerik: {content}\n\n"
             
-            logger.info(f"✅ Vector context: {len(context)} karakter")
+            logger.info(f"✅ Native vector context: {len(context)} karakter")
             return context
             
         except Exception as e:
-            logger.error(f"❌ Vector context hatası: {e}")
+            logger.error(f"❌ Native vector context hatası: {e}")
             return f"Vector arama hatası: {str(e)[:100]}"
 
     async def _get_csv_context_safe(self, question: str) -> str:
@@ -463,6 +496,16 @@ class TercihAsistaniProcessor:
         """Gelişmiş bağlantı testi"""
         results = {}
         
+        # OpenAI Client test
+        try:
+            if self.openai_client:
+                test_embedding = self.get_embedding("test")
+                results["OpenAI Client"] = f"✅ Bağlı ({len(test_embedding)} boyut embedding)"
+            else:
+                results["OpenAI Client"] = "❌ Client başlatılmadı"
+        except Exception as e:
+            results["OpenAI Client"] = f"❌ Hata: {str(e)[:50]}"
+        
         # LLM testleri
         llm_tests = [
             ("Evaluation", self.llm_evaluation),
@@ -482,15 +525,15 @@ class TercihAsistaniProcessor:
             except Exception as e:
                 results[name] = f"❌ Hata: {str(e)[:50]}"
         
-        # AstraDB test
+        # Native AstraDB test
         try:
-            if self.vectorstore:
-                self.vectorstore.similarity_search("test", k=1)
-                results["AstraDB"] = "✅ Bağlı ve çalışıyor"
+            if self.astra_collection:
+                test_results = list(self.astra_collection.find({}, limit=1))
+                results["AstraDB Native"] = f"✅ Bağlı ({len(test_results)} test doküman)"
             else:
-                results["AstraDB"] = "❌ VectorStore oluşturulamadı"
+                results["AstraDB Native"] = "❌ Collection başlatılmadı"
         except Exception as e:
-            results["AstraDB"] = f"❌ Hata: {str(e)[:50]}"
+            results["AstraDB Native"] = f"❌ Hata: {str(e)[:50]}"
         
         # CSV test
         if self.csv_data is not None:
