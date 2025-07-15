@@ -144,17 +144,14 @@ class TercihAsistaniProcessor:
                         setattr(self, f"llm_{name}", None)
 
     async def _initialize_astradb(self):
-        """AstraDB bağlantısını başlat - Yeni collection ile debug"""
+        """AstraDB bağlantısını başlat - Field mapping ile"""
         try:
             logger.info("🔌 AstraDB bağlantısı başlatılıyor...")
             
             # Token ve endpoint kontrolü
             token = DatabaseSettings.ASTRA_DB_TOKEN
             endpoint = DatabaseSettings.ASTRA_DB_API_ENDPOINT
-            
-            # 🎯 YENİ COLLECTION - Hard-coded
             collection_name = "tercihrehberligi_pdf_collection_new"
-            logger.info(f"🎯 Target collection: {collection_name}")
             
             if not token or not endpoint:
                 logger.error("❌ AstraDB credentials eksik")
@@ -171,35 +168,37 @@ class TercihAsistaniProcessor:
             
             if collection_name not in collections:
                 logger.error(f"❌ Collection '{collection_name}' bulunamadı!")
-                logger.info(f"💡 Mevcut collection'lar: {collections}")
                 self.vectorstore = None
                 return
             
             logger.info(f"✅ Collection '{collection_name}' bulundu!")
             
-            # 🎯 YENİ EMBEDDING - 1536 dimensions
+            # Embedding oluştur
             logger.info("🔧 Embedding oluşturuluyor - 1536 dimensions...")
             embedding = OpenAIEmbeddings(
                 model="text-embedding-3-small",
-                dimensions=1536,  # YENİ collection ile uyumlu
+                dimensions=1536,
                 openai_api_key=os.getenv("OPENAI_API_KEY")
             )
             logger.info("✅ Embedding oluşturuldu")
             
-            # VectorStore oluştur
+            # 🎯 FIELD MAPPING ile VectorStore oluştur
             try:
-                logger.info("🔧 VectorStore oluşturuluyor...")
+                logger.info("🔧 VectorStore oluşturuluyor - Field mapping ile...")
                 self.vectorstore = AstraDBVectorStore(
                     token=token,
                     api_endpoint=endpoint,
                     collection_name=collection_name,
                     embedding=embedding,
+                    # 🎯 FIELD MAPPING - Collection'daki field'ları LangChain'e tanıt
+                    content_field="$vectorize",  # Metin içeriği bu field'da
+                    metadata_field="metadata",   # Metadata bu field'da (zaten doğru)
                 )
-                logger.info("✅ VectorStore instance oluşturuldu")
+                logger.info("✅ VectorStore instance oluşturuldu - Field mapping ile")
                 
-                # 🔍 KAPSAMLI TEST
+                # Test arama
                 logger.info("🧪 Vector arama testi başlıyor...")
-                test_docs = self.vectorstore.similarity_search("üniversite tercih rehberi", k=2)
+                test_docs = self.vectorstore.similarity_search("üniversite tercih", k=2)
                 logger.info(f"✅ Test arama başarılı: {len(test_docs)} doküman bulundu")
                 
                 # Detaylı test sonuçları
@@ -208,26 +207,17 @@ class TercihAsistaniProcessor:
                         logger.info(f"📄 Doc {i+1}: {doc.page_content[:100]}...")
                         logger.info(f"🏷️ Metadata: {doc.metadata}")
                         
-                    logger.info(f"🎯 VectorStore tamamen çalışıyor - Collection: {collection_name}")
-                    logger.info(f"📊 Total records: 916, Test buldu: {len(test_docs)}")
+                    logger.info(f"🎯 VectorStore tamamen çalışıyor!")
                 else:
                     logger.warning("⚠️ Test arama 0 doküman döndürdü")
                     
             except Exception as vs_error:
                 logger.error(f"❌ VectorStore oluşturma hatası: {vs_error}")
                 
-                # Detaylı hata analizi
-                error_str = str(vs_error)
-                if "'content'" in error_str:
-                    logger.error("🔍 'content' hatası - Bu collection'da doküman yapısı problemi")
-                    logger.error("💡 Çözüm: Farklı collection dene veya yeniden index")
-                elif "dimension" in error_str.lower():
-                    logger.error("🔍 Dimension hatası - 1536 vs farklı boyut")
-                    logger.error("💡 Çözüm: Collection dimension'ını kontrol et")
-                elif "embedding" in error_str.lower():
-                    logger.error("🔍 Embedding hatası - OpenAI API problemi")
-                else:
-                    logger.error(f"🔍 Bilinmeyen hata türü: {error_str}")
+                # Eğer field mapping desteklenmiyorsa
+                if "content_field" in str(vs_error) or "unexpected keyword" in str(vs_error):
+                    logger.error("🔍 Field mapping desteklenmiyor - LangChain versiyonu eski olabilir")
+                    logger.info("💡 Çözüm: Custom field mapping implementasyonu gerekli")
                 
                 self.vectorstore = None
                 
