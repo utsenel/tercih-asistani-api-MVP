@@ -433,7 +433,99 @@ class TercihAsistaniProcessor:
             logger.error(f"❌ Düzeltme hatası: {e}")
             return question
 
-    
+    async def _get_vector_context_native(self, question: str) -> str:
+        """Native Astrapy API ile vector search - Fixed parsing"""
+        try:
+            vector_start = time.time()
+            
+            if not self.astra_collection:
+                logger.warning("⚠️ Astra collection mevcut değil")
+                return "Vector arama mevcut değil"
+            
+            logger.info(f"🔍 Vector arama başlatılıyor: '{question[:50]}...'")
+            
+            # Search optimizer bypass edildi - düzeltilmiş soruyu direkt kullan
+            optimized_text = question
+            logger.info(f"📝 Search optimizer bypass - düzeltilmiş soru kullanılıyor")
+            
+            # Embedding oluştur
+            embedding_start = time.time()
+            query_embedding = self.get_embedding(optimized_text)
+            embedding_time = time.time() - embedding_start
+            logger.info(f"✅ Query embedding oluşturuldu: {len(query_embedding)} boyut ({embedding_time:.2f}s)")
+            
+            # Native vector search
+            search_start = time.time()
+            results = self.astra_collection.find(
+                {},
+                sort={"$vector": query_embedding},
+                limit=VectorConfig.SIMILARITY_TOP_K
+            )
+            
+            # Sonuçları işle
+            docs = list(results)
+            search_time = time.time() - search_start
+            logger.info(f"✅ Vector search tamamlandı: {len(docs)} doküman ({search_time:.2f}s)")
+            
+            if not docs:
+                logger.warning("⚠️ Hiç doküman bulunamadı")
+                return "İlgili doküman bulunamadı"
+            
+            # Context oluştur - ASTRAPY PARSING FIX
+            context = ""
+            for i, doc in enumerate(docs):
+                try:
+                    # Astrapy response structure debug
+                    logger.info(f"   🔍 Doc {i+1} structure: {list(doc.keys())}")
+                    
+                    # Multiple parsing attempts
+                    file_path = "Bilinmeyen kaynak"
+                    content = ""
+                    
+                    # Method 1: Direct fields
+                    if 'file_path' in doc:
+                        file_path = doc['file_path']
+                    elif 'metadata' in doc and isinstance(doc['metadata'], dict):
+                        file_path = doc['metadata'].get('file_path', file_path)
+                    
+                    # Content parsing - multiple attempts
+                    if 'content' in doc:
+                        content = doc['content']
+                    elif 'text' in doc:
+                        content = doc['text']
+                    elif '$vectorize' in doc:
+                        content = doc['$vectorize']
+                    else:
+                        # Last resort - convert doc to string and extract
+                        content = str(doc)
+                        # Try to extract meaningful content from string representation
+                        if "'content':" in content:
+                            import re
+                            match = re.search(r"'content':\s*'([^']+)'", content)
+                            if match:
+                                content = match.group(1)
+                    
+                    # Truncate content
+                    content = str(content)[:500]
+                    
+                    context += f"Dosya: {file_path}\nİçerik: {content}\n\n"
+                    
+                    logger.info(f"   📄 Doküman {i+1}: {file_path}")
+                    logger.info(f"       İçerik uzunluğu: {len(content)}")
+                    logger.info(f"       İçerik özet: '{content[:80]}...'")
+                    
+                except Exception as parse_error:
+                    logger.error(f"   ❌ Doküman {i+1} parse hatası: {parse_error}")
+                    context += f"Dosya: Parse hatası\nİçerik: Doküman okunamadı\n\n"
+            
+            total_time = time.time() - vector_start
+            logger.info(f"✅ Vector context hazır: {len(context)} karakter (toplam {total_time:.2f}s)")
+            
+            return context
+            
+        except Exception as e:
+            logger.error(f"❌ Vector context hatası: {e}")
+            return f"Vector arama hatası: {str(e)[:100]}"
 
     async def _get_csv_context_safe(self, question: str) -> str:
         """Güvenli CSV analiz - Detaylı logging"""
