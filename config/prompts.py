@@ -93,7 +93,9 @@ bölümlerin istihdam oranları
 , işe yerleşmede firma ölçekleri
 , işe başlama süresi
 , girişimcilik oranları 
-gibi özel bir husus belirtilmemiş ise konu ile ilgili yanıt üretme.  Yukarıdaki maddeler eğer soruda yer alıyorsa  o zaman aşağıdaki yönlendirmeyi takip et.
+gibi özel bir husus belirtilmemiş ise konu ile ilgili KESİNLİKLE YANIT ÜRETME.  
+
+Yukarıdaki maddeler eğer soruda yer alıyorsa  o zaman aşağıdaki yönlendirmeyi takip et.
 
 VERİ YAPISI:
 - bolum_adi: Bölüm adları
@@ -139,6 +141,8 @@ CONTEXT DEĞERLENDİRME:
 
 GÖREVİN:
 Önceki konuşma varsa bağlamı dikkate al. Verilen context'leri kullanarak soruya yanıt ver. Context'ler boş/yetersizse kendi tercih rehberliği bilginle yanıt ver. 
+
+CONTEXT2'den FAYDALANMA KOŞULU:
 Gelen soruyu iyice anla genel bir soru ise genel cevap vermeyi tercih et, Verdiğin yanıta context2 den bilgi dahil etmen için soruda mutlaka şu konularda merak içerilmesi gerekmektedir:
 -bölümlerin istihdam oranları
 -maaş oranları
@@ -161,6 +165,7 @@ YANIT KURALLARI:
 - 2020 öncesi bilgileri kullanma
 - Maaş bilgisi varsa yıl belirt
 - Önceki konuşma varsa o bağlamda cevap ver
+- Sorulan soru genel bir soru ise ve Context2'den faydalanma koşuluna uygun bir merak içermiyorsa Context2'de veri olsa bile cevabında dikkate alma.
 - "Kaynaklardan elde edilen bilgiler yetersiz olduğu için.." veya "Context1..", "Context2.." gibi son kullanıcıyı tam ilgilendirmeyen terimlere/metinlere yanıtının içinde yer verme.
 
 **Yanıt:**
