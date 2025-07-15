@@ -109,19 +109,67 @@ async def chat_endpoint(request: Request, chat_request: ChatRequest):
     start_time = time.time()
     
     try:
-        logger.info(f"📥 Frontend'den gelen session_id: '{chat_request.session_id}'")
-        logger.info(f"🌐 Request origin bilgileri kontrol ediliyor...")
+        logger.info(f"📥 CHAT REQUEST DEBUG:")
+        logger.info(f"   📝 Gelen mesaj: '{chat_request.message[:50]}...'")
+        logger.info(f"   🔑 Frontend session_id: '{chat_request.session_id}'")
         
-        # Client IP'yi al
+        # CLIENT IP DETAYLI ANALİZİ
         client_ip = request.client.host
         
-        # Frontend "ng" gönderiyorsa IP-based session oluştur
-        if not chat_request.session_id or chat_request.session_id in ["ng", "default", ""]:
-            ip_hash = hashlib.md5(client_ip.encode()).hexdigest()[:8]
-            chat_request.session_id = f"ip_{ip_hash}"
-            logger.info(f"🔄 IP-based session oluşturuldu: '{chat_request.session_id}' (IP: {client_ip})")
+        # Proxy header'larını kontrol et
+        forwarded_for = request.headers.get("X-Forwarded-For")
+        real_ip = request.headers.get("X-Real-IP") 
+        cf_connecting_ip = request.headers.get("CF-Connecting-IP")  # Cloudflare
         
-        logger.info(f"Gelen mesaj: {chat_request.message[:100]}...")
+        logger.info(f"🌐 IP ANALİZİ:")
+        logger.info(f"   🔌 request.client.host: '{client_ip}'")
+        logger.info(f"   📡 X-Forwarded-For: '{forwarded_for}'")
+        logger.info(f"   🌍 X-Real-IP: '{real_ip}'")
+        logger.info(f"   ☁️ CF-Connecting-IP: '{cf_connecting_ip}'")
+        
+        # En güvenilir IP'yi seç
+        actual_ip = cf_connecting_ip or real_ip or forwarded_for or client_ip
+        if forwarded_for and "," in forwarded_for:
+            actual_ip = forwarded_for.split(",")[0].strip()
+        
+        logger.info(f"   ✅ Selected IP: '{actual_ip}'")
+        
+        # SESSION ID GENERATION WITH STABLE IP
+        original_session_id = chat_request.session_id
+        
+        if not chat_request.session_id or chat_request.session_id in ["ng", "default", ""]:
+            # STABLE HASH - IP + User-Agent kombine et
+            user_agent = request.headers.get("user-agent", "unknown")[:50]  # İlk 50 karakter
+            
+            # Hash input'u stabil olsun
+            hash_input = f"{actual_ip}_{user_agent}"
+            ip_hash = hashlib.md5(hash_input.encode()).hexdigest()[:8]
+            chat_request.session_id = f"stable_{ip_hash}"
+            
+            logger.info(f"🔄 SESSION ID GENERATION:")
+            logger.info(f"   📊 Hash input: '{hash_input[:80]}...'")
+            logger.info(f"   🎯 Generated session: '{chat_request.session_id}'")
+        else:
+            logger.info(f"✅ Frontend session kullanılıyor: '{chat_request.session_id}'")
+        
+        logger.info(f"📊 SESSION TRANSITION:")
+        logger.info(f"   📥 Original: '{original_session_id}'")
+        logger.info(f"   📤 Final: '{chat_request.session_id}'")
+        
+        # Redis'te bu session'ın durumunu kontrol et
+        try:
+            # Memory instance'a erişim
+            if hasattr(processor, 'memory') and processor.memory and processor.memory.redis_client:
+                redis_key = f"chat:{chat_request.session_id}"
+                exists = processor.memory.redis_client.exists(redis_key)
+                
+                if exists:
+                    message_count = processor.memory.redis_client.llen(redis_key)
+                    logger.info(f"📊 EXISTING SESSION: '{redis_key}' - {message_count} mesaj")
+                else:
+                    logger.info(f"🆕 NEW SESSION: '{redis_key}' - ilk mesaj")
+        except Exception as redis_check_error:
+            logger.warning(f"⚠️ Redis session check hatası: {redis_check_error}")
         
         # Chat processor ile işle
         result = await processor.process_message(
@@ -139,7 +187,9 @@ async def chat_endpoint(request: Request, chat_request: ChatRequest):
             metadata={
                 "processing_time": processing_time,
                 "session_id": chat_request.session_id,
-                "message_length": len(chat_request.message)
+                "message_length": len(chat_request.message),
+                "client_ip": actual_ip,  # Debug için
+                "session_transition": f"{original_session_id} → {chat_request.session_id}"
             }
         )
         
