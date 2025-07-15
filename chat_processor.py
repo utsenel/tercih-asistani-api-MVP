@@ -144,14 +144,17 @@ class TercihAsistaniProcessor:
                         setattr(self, f"llm_{name}", None)
 
     async def _initialize_astradb(self):
-        """Gelişmiş AstraDB başlatma"""
+        """AstraDB bağlantısını başlat - Yeni collection ile debug"""
         try:
             logger.info("🔌 AstraDB bağlantısı başlatılıyor...")
             
             # Token ve endpoint kontrolü
             token = DatabaseSettings.ASTRA_DB_TOKEN
             endpoint = DatabaseSettings.ASTRA_DB_API_ENDPOINT
-            collection_name = DatabaseSettings.ASTRA_DB_COLLECTION
+            
+            # 🎯 YENİ COLLECTION - Hard-coded
+            collection_name = "tercihrehberligi_pdf_collection_new"
+            logger.info(f"🎯 Target collection: {collection_name}")
             
             if not token or not endpoint:
                 logger.error("❌ AstraDB credentials eksik")
@@ -168,36 +171,63 @@ class TercihAsistaniProcessor:
             
             if collection_name not in collections:
                 logger.error(f"❌ Collection '{collection_name}' bulunamadı!")
+                logger.info(f"💡 Mevcut collection'lar: {collections}")
                 self.vectorstore = None
                 return
             
-            # Embedding oluştur
+            logger.info(f"✅ Collection '{collection_name}' bulundu!")
+            
+            # 🎯 YENİ EMBEDDING - 1536 dimensions
+            logger.info("🔧 Embedding oluşturuluyor - 1536 dimensions...")
             embedding = OpenAIEmbeddings(
                 model="text-embedding-3-small",
-                dimensions=1536,
+                dimensions=1536,  # YENİ collection ile uyumlu
                 openai_api_key=os.getenv("OPENAI_API_KEY")
             )
+            logger.info("✅ Embedding oluşturuldu")
             
-            # VectorStore oluştur (gelişmiş hata yönetimi)
+            # VectorStore oluştur
             try:
+                logger.info("🔧 VectorStore oluşturuluyor...")
                 self.vectorstore = AstraDBVectorStore(
                     token=token,
                     api_endpoint=endpoint,
                     collection_name=collection_name,
                     embedding=embedding,
                 )
+                logger.info("✅ VectorStore instance oluşturuldu")
                 
-                # Bağlantı testi
-                test_docs = self.vectorstore.similarity_search("test", k=1)
-                logger.info(f"✅ AstraDB VectorStore başarılı - Test: {len(test_docs)} doküman")
+                # 🔍 KAPSAMLI TEST
+                logger.info("🧪 Vector arama testi başlıyor...")
+                test_docs = self.vectorstore.similarity_search("üniversite tercih rehberi", k=2)
+                logger.info(f"✅ Test arama başarılı: {len(test_docs)} doküman bulundu")
                 
+                # Detaylı test sonuçları
+                if test_docs:
+                    for i, doc in enumerate(test_docs):
+                        logger.info(f"📄 Doc {i+1}: {doc.page_content[:100]}...")
+                        logger.info(f"🏷️ Metadata: {doc.metadata}")
+                        
+                    logger.info(f"🎯 VectorStore tamamen çalışıyor - Collection: {collection_name}")
+                    logger.info(f"📊 Total records: 916, Test buldu: {len(test_docs)}")
+                else:
+                    logger.warning("⚠️ Test arama 0 doküman döndürdü")
+                    
             except Exception as vs_error:
-                logger.error(f"❌ VectorStore oluşturma detaylı hatası: {vs_error}")
+                logger.error(f"❌ VectorStore oluşturma hatası: {vs_error}")
                 
-                # Hata analizi
-                if "'content'" in str(vs_error):
-                    logger.error("🔍 'content' hatası - Doküman yapısı problemi olabilir")
-                    logger.info("💡 Çözüm: Collection'u yeniden oluşturmayı deneyin")
+                # Detaylı hata analizi
+                error_str = str(vs_error)
+                if "'content'" in error_str:
+                    logger.error("🔍 'content' hatası - Bu collection'da doküman yapısı problemi")
+                    logger.error("💡 Çözüm: Farklı collection dene veya yeniden index")
+                elif "dimension" in error_str.lower():
+                    logger.error("🔍 Dimension hatası - 1536 vs farklı boyut")
+                    logger.error("💡 Çözüm: Collection dimension'ını kontrol et")
+                elif "embedding" in error_str.lower():
+                    logger.error("🔍 Embedding hatası - OpenAI API problemi")
+                else:
+                    logger.error(f"🔍 Bilinmeyen hata türü: {error_str}")
                 
                 self.vectorstore = None
                 
