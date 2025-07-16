@@ -19,7 +19,7 @@ from langchain_anthropic import ChatAnthropic
 from config import (
     LLMConfigs, LLMProvider, VectorConfig, CSVConfig,
     PromptTemplates, CSV_KEYWORDS,
-    DatabaseSettings, MessageSettings
+    DatabaseSettings, MessageSettings, AppSettings
 )
 
 logger = logging.getLogger(__name__)
@@ -30,7 +30,8 @@ class LLMFactory:
         """Gelişmiş hata yönetimi ile LLM oluştur"""
         try:
             params = config.to_langchain_params()
-            logger.info(f"🤖 LLM oluşturuluyor: {config.provider.value} - {config.model}")
+            if AppSettings.DEBUG_MODE:
+                logger.debug(f"LLM creating: {config.provider.value} - {config.model}")
             
             if config.provider == LLMProvider.OPENAI:
                 from langchain_openai import ChatOpenAI
@@ -42,10 +43,10 @@ class LLMFactory:
                 from langchain_anthropic import ChatAnthropic
                 return ChatAnthropic(**params)
             else:
-                raise ValueError(f"Desteklenmeyen provider: {config.provider}")
+                raise ValueError(f"Unsupported provider: {config.provider}")
                 
         except Exception as e:
-            logger.error(f"❌ LLM oluşturma hatası ({config.provider.value}): {e}")
+            logger.error(f"LLM creation error ({config.provider.value}): {e}")
             raise
 
 class TercihAsistaniProcessor:
@@ -57,7 +58,7 @@ class TercihAsistaniProcessor:
         # YENİ: Smart Evaluator-Corrector
         self.llm_smart_evaluator_corrector = None
         
-        # KALAN LLM'LER - search optimizer kaldırıldı
+        # KALAN LLM'LER
         self.llm_csv_agent = None
         self.llm_final = None
         
@@ -74,7 +75,7 @@ class TercihAsistaniProcessor:
             PromptTemplates.SMART_EVALUATOR_CORRECTOR
         )
         
-        # KALAN PROMPT'LAR - search optimizer kaldırıldı
+        # KALAN PROMPT'LAR
         self.csv_agent_prompt = ChatPromptTemplate.from_template(PromptTemplates.CSV_AGENT)
         self.final_prompt = ChatPromptTemplate.from_template(PromptTemplates.FINAL_RESPONSE)
 
@@ -87,7 +88,7 @@ class TercihAsistaniProcessor:
             )
             return response.data[0].embedding
         except Exception as e:
-            logger.error(f"❌ Embedding oluşturma hatası: {e}")
+            logger.error(f"Embedding creation error: {e}")
             raise
 
     def _get_recent_history(self, session_id: str, limit: int = 4) -> str:
@@ -108,19 +109,19 @@ class TercihAsistaniProcessor:
             
             recent_history = '\n'.join(recent_lines)
             
-            logger.info(f"📜 Recent history alındı: {len(recent_history)} karakter")
-            logger.info(f"   İçerik: '{recent_history[:100]}...'")
+            if AppSettings.LOG_MEMORY_OPERATIONS:
+                logger.debug(f"Recent history retrieved: {len(recent_history)} chars")
             
             return recent_history
             
         except Exception as e:
-            logger.error(f"❌ Recent history alma hatası: {e}")
+            logger.error(f"Recent history error: {e}")
             return ""
 
     async def initialize(self):
         """Güncellenmiş başlatma - Smart Evaluator ile"""
         try:
-            logger.info("🚀 TercihAsistaniProcessor başlatılıyor...")
+            logger.info("TercihAsistaniProcessor initializing...")
             
             # API Key kontrolü
             self._check_api_keys()
@@ -137,10 +138,10 @@ class TercihAsistaniProcessor:
             # CSV verilerini yükle
             await self._initialize_csv()
                 
-            logger.info("✅ TercihAsistaniProcessor başarıyla başlatıldı")
+            logger.info("TercihAsistaniProcessor initialized successfully")
             
         except Exception as e:
-            logger.error(f"❌ Initialization hatası: {e}")
+            logger.error(f"Initialization error: {e}")
             raise
 
     def _check_api_keys(self):
@@ -153,26 +154,27 @@ class TercihAsistaniProcessor:
             "ASTRA_DB_API_ENDPOINT": os.getenv("ASTRA_DB_API_ENDPOINT")
         }
         
-        logger.info("🔑 API Key durumu:")
+        logger.info("API Key status check:")
         for key, value in keys.items():
-            status = "✅ Set" if value else "❌ Missing"
-            logger.info(f"   {key}: {status}")
+            status = "Set" if value else "Missing"
+            if AppSettings.DEBUG_MODE:
+                logger.debug(f"   {key}: {status}")
             
         # Critical keys check
         if not keys["OPENAI_API_KEY"]:
-            raise ValueError("OPENAI_API_KEY zorunlu!")
+            raise ValueError("OPENAI_API_KEY is required!")
 
     def _initialize_openai_client(self):
         """OpenAI client'ı başlat"""
         try:
             self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-            logger.info("✅ OpenAI client başlatıldı")
+            logger.info("OpenAI client initialized")
         except Exception as e:
-            logger.error(f"❌ OpenAI client hatası: {e}")
+            logger.error(f"OpenAI client error: {e}")
             raise
 
     async def _initialize_llms_new(self):
-        """YENİ LLM başlatma - Search Optimizer kaldırıldı"""
+        """YENİ LLM başlatma"""
         llm_configs = {
             "smart_evaluator_corrector": LLMConfigs.SMART_EVALUATOR_CORRECTOR,
             "csv_agent": LLMConfigs.CSV_AGENT,
@@ -183,27 +185,27 @@ class TercihAsistaniProcessor:
             try:
                 llm = LLMFactory.create_llm(config)
                 setattr(self, f"llm_{name}", llm)
-                logger.info(f"✅ {name} LLM başarılı: {config.model}")
+                logger.info(f"{name} LLM initialized: {config.model}")
                 
             except Exception as e:
-                logger.error(f"❌ {name} LLM hatası: {e}")
+                logger.error(f"{name} LLM error: {e}")
                 
                 # Critical LLM'ler için fallback
                 if name in ["smart_evaluator_corrector", "csv_agent", "final"]:
-                    logger.warning(f"🔄 {name} için OpenAI fallback...")
+                    logger.warning(f"{name} using OpenAI fallback...")
                     fallback_config = LLMConfigs.FINAL_RESPONSE  # OpenAI model
                     try:
                         llm = LLMFactory.create_llm(fallback_config)
                         setattr(self, f"llm_{name}", llm)
-                        logger.info(f"✅ {name} fallback başarılı")
+                        logger.info(f"{name} fallback successful")
                     except Exception as fb_error:
-                        logger.error(f"❌ {name} fallback hatası: {fb_error}")
+                        logger.error(f"{name} fallback failed: {fb_error}")
                         setattr(self, f"llm_{name}", None)
 
     async def _initialize_astradb_native(self):
         """AstraDB native API ile bağlantı"""
         try:
-            logger.info("🔌 AstraDB native API bağlantısı başlatılıyor...")
+            logger.info("Initializing AstraDB native API connection...")
             
             # Astra client oluştur
             astra_client = DataAPIClient(DatabaseSettings.ASTRA_DB_TOKEN)
@@ -217,14 +219,14 @@ class TercihAsistaniProcessor:
             collection_name = DatabaseSettings.ASTRA_DB_COLLECTION
             self.astra_collection = self.astra_database.get_collection(collection_name)
             
-            logger.info(f"✅ AstraDB native bağlantısı başarılı - Collection: {collection_name}")
+            logger.info(f"AstraDB connected - Collection: {collection_name}")
             
             # Test sorgusu
             test_results = list(self.astra_collection.find({}, limit=1))
-            logger.info(f"✅ Test sorgusu başarılı: {len(test_results)} doküman bulundu")
+            logger.info(f"Connection test successful: {len(test_results)} documents found")
             
         except Exception as e:
-            logger.error(f"❌ AstraDB native bağlantı hatası: {e}")
+            logger.error(f"AstraDB connection error: {e}")
             self.astra_database = None
             self.astra_collection = None
 
@@ -234,7 +236,7 @@ class TercihAsistaniProcessor:
             csv_path = DatabaseSettings.CSV_FILE_PATH
             
             if not csv_path or not os.path.exists(csv_path):
-                logger.warning(f"⚠️ CSV dosyası bulunamadı: {csv_path}")
+                logger.warning(f"CSV file not found: {csv_path}")
                 self.csv_data = None
                 return
             
@@ -242,7 +244,7 @@ class TercihAsistaniProcessor:
             
             # Veri validasyonu
             if self.csv_data.empty:
-                logger.warning("⚠️ CSV dosyası boş")
+                logger.warning("CSV file is empty")
                 self.csv_data = None
                 return
             
@@ -251,14 +253,14 @@ class TercihAsistaniProcessor:
             missing_cols = [col for col in required_cols if col not in self.csv_data.columns]
             
             if missing_cols:
-                logger.error(f"❌ CSV'de eksik kolonlar: {missing_cols}")
+                logger.error(f"Missing CSV columns: {missing_cols}")
                 self.csv_data = None
                 return
             
-            logger.info(f"✅ CSV verisi yüklendi: {len(self.csv_data)} satır, {len(self.csv_data.columns)} kolon")
+            logger.info(f"CSV data loaded: {len(self.csv_data)} rows, {len(self.csv_data.columns)} columns")
             
         except Exception as e:
-            logger.error(f"❌ CSV yükleme hatası: {e}")
+            logger.error(f"CSV loading error: {e}")
             self.csv_data = None
 
     async def _smart_evaluate_and_correct(self, message: str, session_id: str) -> Dict[str, str]:
@@ -267,7 +269,8 @@ class TercihAsistaniProcessor:
             smart_start = time.time()
             
             if not self.llm_smart_evaluator_corrector:
-                logger.warning("⚠️ Smart Evaluator-Corrector LLM mevcut değil, fallback")
+                if AppSettings.LOG_LLM_RESPONSES:
+                    logger.debug("Smart Evaluator-Corrector LLM unavailable, fallback")
                 return {
                     "status": "UYGUN",
                     "enhanced_question": message
@@ -276,9 +279,8 @@ class TercihAsistaniProcessor:
             # Son birkaç mesajı al
             recent_history = self._get_recent_history(session_id, limit=4)
             
-            logger.info(f"🧠 SMART EVALUATOR-CORRECTOR başlatılıyor:")
-            logger.info(f"   📝 Orijinal mesaj: '{message[:50]}...'")
-            logger.info(f"   📜 History: {len(recent_history)} karakter")
+            if AppSettings.LOG_LLM_RESPONSES:
+                logger.debug(f"Smart Evaluator starting: message_len={len(message)}, history_len={len(recent_history)}")
             
             # Smart Evaluator-Corrector'a gönder
             result = await self.llm_smart_evaluator_corrector.ainvoke(
@@ -291,8 +293,8 @@ class TercihAsistaniProcessor:
             response = result.content.strip()
             smart_time = time.time() - smart_start
             
-            logger.info(f"🤖 Smart Evaluator-Corrector raw response ({smart_time:.2f}s):")
-            logger.info(f"   📄 Raw output: '{response[:150]}...'")
+            if AppSettings.LOG_LLM_RESPONSES:
+                logger.debug(f"Smart Evaluator response ({smart_time:.2f}s): {response[:100]}...")
             
             # Response'u parse et
             try:
@@ -304,18 +306,16 @@ class TercihAsistaniProcessor:
                     status = status_match.group(1).strip()
                     enhanced_question = question_match.group(1).strip()
                     
-                    logger.info(f"✅ PARSE BAŞARILI:")
-                    logger.info(f"   📊 Status: {status}")
-                    logger.info(f"   📝 Enhanced Q: '{enhanced_question[:80]}...'")
+                    if AppSettings.LOG_LLM_RESPONSES:
+                        logger.debug(f"Parse successful: Status={status}, Enhanced_len={len(enhanced_question)}")
                     
                     return {
                         "status": status,
                         "enhanced_question": enhanced_question
                     }
                 else:
-                    logger.warning("⚠️ Parse başarısız - format hatası")
-                    logger.warning(f"   Status match: {bool(status_match)}")
-                    logger.warning(f"   Question match: {bool(question_match)}")
+                    if AppSettings.LOG_LLM_RESPONSES:
+                        logger.debug("Parse failed - format error, using fallback")
                     
                     # Fallback parsing
                     if "UYGUN" in response.upper():
@@ -326,12 +326,12 @@ class TercihAsistaniProcessor:
                         return {"status": "KAPSAM_DIŞI", "enhanced_question": message}
                         
             except Exception as parse_error:
-                logger.error(f"❌ Parse hatası: {parse_error}")
+                logger.error(f"Smart Evaluator parse error: {parse_error}")
                 return {"status": "UYGUN", "enhanced_question": message}
             
         except Exception as e:
             smart_time = time.time() - smart_start
-            logger.error(f"❌ Smart Evaluator-Corrector hatası ({smart_time:.2f}s): {e}")
+            logger.error(f"Smart Evaluator-Corrector error ({smart_time:.2f}s): {e}")
             return {"status": "UYGUN", "enhanced_question": message}
 
     async def process_message(self, message: str, session_id: str = "default") -> Dict[str, Any]:
@@ -339,8 +339,7 @@ class TercihAsistaniProcessor:
         start_time = time.time()
         
         try:
-            logger.info(f"📨 Mesaj işleniyor - Session: {session_id}")
-            logger.info(f"📝 Gelen mesaj: '{message[:100]}...' ({len(message)} karakter)")
+            logger.info(f"Processing message: session={session_id}, length={len(message)}")
             
             # Adım 1: YENİ Smart Evaluator-Corrector
             smart_start = time.time()
@@ -350,14 +349,14 @@ class TercihAsistaniProcessor:
             status = smart_result["status"]
             enhanced_question = smart_result["enhanced_question"]
             
-            logger.info(f"⏱️ Smart Evaluator-Corrector süresi: {smart_time:.2f}s")
-            logger.info(f"📊 Status: {status}")
-            logger.info(f"📝 Enhanced Question: '{enhanced_question[:100]}...'")
+            if AppSettings.DETAILED_TIMING:
+                logger.debug(f"Smart Evaluator-Corrector: {smart_time:.2f}s, Status: {status}")
             
             # Adım 2: Koşullu yönlendirme
             if status == "KAPSAM_DIŞI":
                 total_time = time.time() - start_time
-                logger.info(f"🚫 Kapsam dışı soru - Toplam süre: {total_time:.2f}s")
+                if AppSettings.PERFORMANCE_LOGGING:
+                    logger.info(f"Out of scope request completed in {total_time:.2f}s")
                 return {
                     "response": MessageSettings.ERROR_EXPERTISE_OUT,
                     "sources": []
@@ -365,7 +364,8 @@ class TercihAsistaniProcessor:
             
             if status == "SELAMLAMA":
                 total_time = time.time() - start_time
-                logger.info(f"👋 Selamlama algılandı - Toplam süre: {total_time:.2f}s")
+                if AppSettings.PERFORMANCE_LOGGING:
+                    logger.info(f"Greeting request completed in {total_time:.2f}s")
                 return {
                     "response": "Merhaba! Ben bir üniversite tercih asistanıyım. Size YKS tercihleri, bölüm seçimi, kariyer planlaması konularında yardımcı olabilirim. Hangi konuda bilgi almak istiyorsunuz?",
                     "sources": []
@@ -373,7 +373,6 @@ class TercihAsistaniProcessor:
             
             # Adım 3: PARALEL İŞLEMLER - Enhanced question ile
             parallel_start = time.time()
-            logger.info("🔄 Paralel işlemler başlatılıyor...")
             
             # Task'ları oluştur
             vector_task = asyncio.create_task(
@@ -391,31 +390,31 @@ class TercihAsistaniProcessor:
                     return_exceptions=True
                 )
             except Exception as e:
-                logger.error(f"❌ Paralel işleme genel hatası: {e}")
-                context1 = "Vector arama başarısız"
-                context2 = "CSV analizi başarısız"
+                logger.error(f"Parallel processing error: {e}")
+                context1 = "Vector search failed"
+                context2 = "CSV analysis failed"
             
             parallel_time = time.time() - parallel_start
-            logger.info(f"⏱️ Paralel işlemler toplam süresi: {parallel_time:.2f}s")
+            
+            if AppSettings.DETAILED_TIMING:
+                logger.debug(f"Parallel processing: {parallel_time:.2f}s")
             
             # Exception'ları handle et
             if isinstance(context1, Exception):
-                logger.error(f"❌ Vector context hatası: {context1}")
-                context1 = "Vector arama başarısız"
+                logger.error(f"Vector context error: {context1}")
+                context1 = "Vector search failed"
                 
             if isinstance(context2, Exception):
-                logger.error(f"❌ CSV context hatası: {context2}")
-                context2 = "CSV analizi başarısız"
-            
-            # Context detaylarını logla
-            logger.info(f"📄 CONTEXT1 (Vector) - {len(context1)} karakter")
-            logger.info(f"📊 CONTEXT2 (CSV) - {len(context2)} karakter")
+                logger.error(f"CSV context error: {context2}")
+                context2 = "CSV analysis failed"
             
             # Adım 4: Memory'den geçmiş al
             memory_start = time.time()
             conversation_history = self.memory.get_history(session_id)
             memory_time = time.time() - memory_start
-            logger.info(f"🧠 Memory geçmişi alındı ({memory_time:.3f}s): {len(conversation_history)} karakter")
+            
+            if AppSettings.DETAILED_TIMING:
+                logger.debug(f"Memory fetch: {memory_time:.3f}s")
             
             # Adım 5: Final yanıt oluşturma - Enhanced question ile
             final_start = time.time()
@@ -426,42 +425,46 @@ class TercihAsistaniProcessor:
                 history=conversation_history
             )
             final_time = time.time() - final_start
-            logger.info(f"⏱️ Final response süresi: {final_time:.2f}s")
-            logger.info(f"✅ Final yanıt: {len(final_response)} karakter")
+            
+            if AppSettings.DETAILED_TIMING:
+                logger.debug(f"Final response generation: {final_time:.2f}s")
 
             # Memory'ye kaydet - orijinal mesajı kaydet
             memory_save_start = time.time()
             self.memory.add_message(session_id, "user", message)  # Orijinal mesaj
             self.memory.add_message(session_id, "assistant", final_response)
             memory_save_time = time.time() - memory_save_start
-            logger.info(f"💾 Memory kayıt tamamlandı ({memory_save_time:.3f}s)")
+            
+            if AppSettings.DETAILED_TIMING:
+                logger.debug(f"Memory save: {memory_save_time:.3f}s")
 
             # PERFORMANS RAPORU
             total_time = time.time() - start_time
-            logger.info(f"📈 PERFORMANS RAPORU:")
-            logger.info(f"   🧠 Smart Evaluator-Corrector: {smart_time:.2f}s")
-            logger.info(f"   🔄 Paralel İşlemler: {parallel_time:.2f}s")
-            logger.info(f"   🧠 Memory: {memory_time:.3f}s")
-            logger.info(f"   🎯 Final Response: {final_time:.2f}s")
-            logger.info(f"   💾 Memory Save: {memory_save_time:.3f}s")
-            logger.info(f"   🎉 TOPLAM: {total_time:.2f}s")
+            
+            if AppSettings.PERFORMANCE_LOGGING:
+                if AppSettings.DETAILED_TIMING:
+                    logger.info(f"Request completed in {total_time:.2f}s (Smart: {smart_time:.2f}s, Parallel: {parallel_time:.2f}s, Final: {final_time:.2f}s)")
+                else:
+                    logger.info(f"Request completed in {total_time:.2f}s")
             
             return {
                 "response": final_response,
                 "sources": self._extract_sources(context1, context2),
                 "metadata": {
                     "processing_time": round(total_time, 2),
-                    "smart_evaluator_time": round(smart_time, 2),
-                    "parallel_time": round(parallel_time, 2),
-                    "enhanced_question": enhanced_question,
-                    "original_question": message,
-                    "status": status
+                    **({
+                        "smart_evaluator_time": round(smart_time, 2),
+                        "parallel_time": round(parallel_time, 2),
+                        "enhanced_question": enhanced_question,
+                        "original_question": message,
+                        "status": status
+                    } if AppSettings.DEBUG_MODE else {})
                 }
             }
             
         except Exception as e:
             total_time = time.time() - start_time
-            logger.error(f"❌ Mesaj işleme genel hatası ({total_time:.2f}s): {e}")
+            logger.error(f"Message processing error ({total_time:.2f}s): {e}")
             return {
                 "response": MessageSettings.ERROR_GENERAL,
                 "sources": [],
@@ -469,27 +472,25 @@ class TercihAsistaniProcessor:
             }
 
     async def _get_vector_context_native(self, question: str) -> str:
-        """Native AstraDB ile vector arama - Search optimizer kaldırıldı"""
+        """Native AstraDB ile vector arama - Temizlenmiş"""
         try:
             vector_start = time.time()
             
             if not self.astra_collection:
-                logger.warning("❌ Astra collection mevcut değil")
-                return "Vector arama mevcut değil"
+                logger.warning("Astra collection unavailable")
+                return "Vector search unavailable"
             
-            logger.info(f"🔍 Native vector arama başlatılıyor: {question[:50]}...")
-            
-            # Enhanced question direkt kullan (extra optimization yok)
-            search_text = question
-            logger.info(f"✨ Search text (enhanced): {search_text[:80]}...")
+            if AppSettings.LOG_VECTOR_DETAILS:
+                logger.debug(f"Vector search starting: {question[:50]}...")
             
             # Embedding oluştur
             try:
-                query_embedding = self.get_embedding(search_text)
-                logger.info(f"✅ Query embedding oluşturuldu: {len(query_embedding)} boyut")
+                query_embedding = self.get_embedding(question)
+                if AppSettings.LOG_VECTOR_DETAILS:
+                    logger.debug(f"Query embedding created: {len(query_embedding)} dimensions")
             except Exception as e:
-                logger.error(f"❌ Embedding oluşturma hatası: {e}")
-                return "Embedding oluşturulamadı"
+                logger.error(f"Embedding creation error: {e}")
+                return "Embedding creation failed"
             
             # Native vector search
             try:
@@ -512,11 +513,13 @@ class TercihAsistaniProcessor:
                 )
                 
                 docs = list(search_results)
-                logger.info(f"📄 Bulunan doküman sayısı: {len(docs)}")
+                
+                if AppSettings.LOG_VECTOR_DETAILS:
+                    logger.debug(f"Found {len(docs)} documents")
                 
                 if not docs:
-                    logger.warning("❌ Hiç doküman bulunamadı")
-                    return "İlgili doküman bulunamadı"
+                    logger.warning("No documents found")
+                    return "No relevant documents found"
                 
                 # Doküman içeriklerini birleştir
                 context_parts = []
@@ -544,7 +547,7 @@ class TercihAsistaniProcessor:
                             continue
                         
                         # Kaynak bilgisi
-                        source = "Bilinmeyen kaynak"
+                        source = "Unknown source"
                         if 'metadata' in doc and isinstance(doc['metadata'], dict):
                             metadata = doc['metadata']
                             source = metadata.get('source', metadata.get('file_path', metadata.get('filename', source)))
@@ -562,7 +565,7 @@ class TercihAsistaniProcessor:
                             source_name = source.split('/')[-1] if '/' in source else source
                             if any(char in source_name for char in ['Ä°', 'ZÃ', 'Ã', 'Â']):
                                 source_name = "İZÜ YKS Tercih Rehberi.pdf"
-                            if not source_name or source_name == "Bilinmeyen kaynak":
+                            if not source_name or source_name == "Unknown source":
                                 source_name = "Tercih Rehberi"
                         else:
                             source_name = "Rehber Dokümanı"
@@ -570,48 +573,51 @@ class TercihAsistaniProcessor:
                         context_parts.append(f"**Kaynak**: {source_name}\n**İçerik**: {content}")
                         total_chars += len(content)
                         
-                        logger.info(f"✅ Doküman {i+1} işlendi: {source_name} - {len(content)} karakter")
+                        if AppSettings.LOG_VECTOR_DETAILS:
+                            logger.debug(f"Document {i+1} processed: {source_name} - {len(content)} chars")
                         
                         if total_chars > 2000:
                             break
                             
                     except Exception as doc_error:
-                        logger.error(f"❌ Doküman {i+1} işleme hatası: {doc_error}")
+                        logger.error(f"Document {i+1} processing error: {doc_error}")
                         continue
                 
                 if not context_parts:
-                    logger.error("❌ Hiçbir doküman işlenemedi!")
-                    return "Dokümanlar işlenemedi"
+                    logger.error("No documents could be processed!")
+                    return "Documents could not be processed"
                 
                 final_context = "\n\n".join(context_parts)
                 vector_time = time.time() - vector_start
                 
-                logger.info(f"✅ NATIVE VECTOR ARAMA TAMAMLANDI ({vector_time:.2f}s):")
-                logger.info(f"   📄 İşlenen doküman: {len(context_parts)} adet")
-                logger.info(f"   📝 Toplam context: {len(final_context)} karakter")
+                if AppSettings.DETAILED_TIMING:
+                    logger.debug(f"Vector search completed ({vector_time:.2f}s): {len(context_parts)} docs, {len(final_context)} chars")
                 
                 return final_context
                     
             except Exception as search_error:
-                logger.error(f"❌ Vector arama hatası: {search_error}")
-                return "Vector arama başarısız"
+                logger.error(f"Vector search error: {search_error}")
+                return "Vector search failed"
             
         except Exception as e:
             vector_time = time.time() - vector_start
-            logger.error(f"❌ Vector context genel hatası ({vector_time:.2f}s): {e}")
-            return "Vector arama genel hatası"
+            logger.error(f"Vector context general error ({vector_time:.2f}s): {e}")
+            return "Vector search general error"
 
     async def _get_csv_context_safe(self, question: str) -> str:
-        """CSV analiz - Enhanced question ile"""
+        """CSV analiz - Temizlenmiş"""
         try:
             csv_start = time.time()
             
             if self.csv_data is None:
-                logger.info("❌ CSV verileri mevcut değil")
-                return "CSV verileri mevcut değil"
-    
+                if AppSettings.LOG_CSV_DETAILS:
+                    logger.debug("CSV data unavailable")
+                return "CSV data unavailable"
+
             question_lower = question.lower()
-            logger.info(f"🔍 CSV analizi: '{question_lower[:50]}...'")
+            
+            if AppSettings.LOG_CSV_DETAILS:
+                logger.debug(f"CSV analysis starting: {question_lower[:50]}...")
             
             # CSV anahtar kelimesi kontrolü
             csv_keywords = [
@@ -622,12 +628,13 @@ class TercihAsistaniProcessor:
             ]
             
             csv_required = any(keyword in question_lower for keyword in csv_keywords)
-            logger.info(f"🔍 CSV Keywords check: {csv_required}")
+            
+            if AppSettings.LOG_CSV_DETAILS:
+                logger.debug(f"CSV keywords check: {csv_required}")
             
             if not csv_required:
-                logger.info("⚡ CSV analizi atlandı")
-                return "CSV analizi gerekli değil"
-    
+                return "CSV analysis not required"
+
             # Bölüm adını bul
             bolum_adi = None
             
@@ -642,15 +649,16 @@ class TercihAsistaniProcessor:
                     if any(word in question_lower for word in bolum_words if len(word) > 3):
                         bolum_adi = bolum
                         break
-    
+
             # Spesifik bölüm analizi
             if bolum_adi:
-                logger.info(f"📋 Spesifik bölüm analizi: {bolum_adi}")
+                if AppSettings.LOG_CSV_DETAILS:
+                    logger.debug(f"Specific department analysis: {bolum_adi}")
                 
                 filtered = self.csv_data[self.csv_data['bolum_adi'] == bolum_adi]
                 
                 if filtered.empty:
-                    return f"{bolum_adi} için veri bulunamadı"
+                    return f"No data found for {bolum_adi}"
                 
                 # Metrik sütunlarını belirle
                 metrik_cols = ["istihdam_orani", "girisimcilik_orani", "ortalama_calisma_suresi_ay"]
@@ -674,11 +682,12 @@ class TercihAsistaniProcessor:
                 
             else:
                 # Genel analiz
-                logger.info("📈 Genel CSV analizi")
+                if AppSettings.LOG_CSV_DETAILS:
+                    logger.debug("General CSV analysis")
                 top_bolumler = self.csv_data.nlargest(5, 'istihdam_orani')
                 sample_cols = ['bolum_adi', 'istihdam_orani', 'girisimcilik_orani', 'ortalama_calisma_suresi_ay']
                 csv_snippet = top_bolumler[sample_cols].to_string(index=False)
-    
+
             # CSV Agent'a sor
             if self.llm_csv_agent:
                 try:
@@ -691,30 +700,32 @@ class TercihAsistaniProcessor:
                     analysis = result.content.strip()
                     
                     if len(analysis) < 20:
-                        analysis = f"CSV analizi tamamlandı. {bolum_adi or 'İlgili bölümler'} için temel veriler: {csv_snippet[:200]}..."
+                        analysis = f"CSV analysis completed. Basic data for {bolum_adi or 'relevant departments'}: {csv_snippet[:200]}..."
                         
                 except Exception as agent_error:
-                    logger.error(f"❌ CSV Agent hatası: {agent_error}")
-                    analysis = f"CSV verisi bulundu: {csv_snippet[:300]}..."
+                    logger.error(f"CSV Agent error: {agent_error}")
+                    analysis = f"CSV data found: {csv_snippet[:300]}..."
             else:
-                analysis = f"CSV verisi: {csv_snippet[:300]}..."
-    
+                analysis = f"CSV data: {csv_snippet[:300]}..."
+
             csv_time = time.time() - csv_start
-            logger.info(f"⏱️ CSV analizi süresi: {csv_time:.2f}s")
+            
+            if AppSettings.DETAILED_TIMING:
+                logger.debug(f"CSV analysis completed ({csv_time:.2f}s)")
             
             return analysis
-    
+
         except Exception as e:
             csv_time = time.time() - csv_start
-            logger.error(f"❌ CSV analiz hatası ({csv_time:.2f}s): {e}")
-            return "CSV analizi hatası"
+            logger.error(f"CSV analysis error ({csv_time:.2f}s): {e}")
+            return "CSV analysis error"
             
     async def _generate_final_response_safe(self, question: str, context1: str, context2: str, history: str = "") -> str:
-        """Final yanıt oluşturma"""
+        """Final yanıt oluşturma - Temizlenmiş"""
         try:
             if not self.llm_final:
-                logger.error("❌ Final LLM mevcut değil!")
-                return "Yanıt oluşturma servisi geçici olarak kullanılamıyor."
+                logger.error("Final LLM unavailable!")
+                return "Response generation service temporarily unavailable."
             
             result = await self.llm_final.ainvoke(
                 self.final_prompt.format(
@@ -726,13 +737,15 @@ class TercihAsistaniProcessor:
             )
             
             final_response = result.content.strip()
-            logger.info(f"✅ Final response oluşturuldu: {len(final_response)} karakter")
+            
+            if AppSettings.LOG_LLM_RESPONSES:
+                logger.debug(f"Final response generated: {len(final_response)} chars")
             
             return final_response
             
         except Exception as e:
-            logger.error(f"❌ Final yanıt hatası: {e}")
-            return "Yanıt oluşturulurken hata oluştu."
+            logger.error(f"Final response error: {e}")
+            return "Error occurred while generating response."
 
     def _extract_sources(self, context1: str, context2: str) -> List[str]:
         """Kaynak çıkarma"""
@@ -740,7 +753,7 @@ class TercihAsistaniProcessor:
         
         # Vector context kontrolü
         if context1 and len(context1.strip()) > 50:
-            error_keywords = ["bulunamadı", "başarısız", "mevcut değil", "hata"]
+            error_keywords = ["bulunamadı", "başarısız", "mevcut değil", "hata", "failed", "unavailable", "error"]
             has_error = any(keyword in context1.lower() for keyword in error_keywords)
             
             if not has_error:
@@ -753,11 +766,11 @@ class TercihAsistaniProcessor:
         
         # CSV context kontrolü
         if context2 and len(context2.strip()) > 50:
-            csv_error_keywords = ["mevcut değil", "hata", "başarısız", "gerekli değil"]
+            csv_error_keywords = ["mevcut değil", "hata", "başarısız", "gerekli değil", "unavailable", "failed", "error", "not required"]
             has_csv_error = any(keyword in context2.lower() for keyword in csv_error_keywords)
             
             if not has_csv_error:
-                csv_success_indicators = ["analiz", "oran", "veri", "bölüm", "istihdam", "maaş", "%"]
+                csv_success_indicators = ["analiz", "oran", "veri", "bölüm", "istihdam", "maaş", "%", "analysis", "data"]
                 has_csv_content = any(indicator in context2.lower() for indicator in csv_success_indicators)
                 
                 if has_csv_content:
@@ -770,18 +783,19 @@ class TercihAsistaniProcessor:
 
     async def test_all_connections(self) -> Dict[str, str]:
         """Bağlantı testleri"""
-        logger.info("🧪 TÜM BAĞLANTILAR TEST EDİLİYOR...")
+        if AppSettings.DEBUG_MODE:
+            logger.debug("Testing all connections...")
         results = {}
         
         # OpenAI Client test
         try:
             if self.openai_client:
                 test_embedding = self.get_embedding("test")
-                results["OpenAI Client"] = f"✅ Bağlı ({len(test_embedding)} boyut)"
+                results["OpenAI Client"] = f"✅ Connected ({len(test_embedding)} dimensions)"
             else:
-                results["OpenAI Client"] = "❌ Client başlatılmadı"
+                results["OpenAI Client"] = "❌ Client not initialized"
         except Exception as e:
-            results["OpenAI Client"] = f"❌ Hata: {str(e)[:50]}"
+            results["OpenAI Client"] = f"❌ Error: {str(e)[:50]}"
         
         # LLM testleri
         llm_tests = [
@@ -794,40 +808,40 @@ class TercihAsistaniProcessor:
             try:
                 if llm:
                     await llm.ainvoke("Test")
-                    results[name] = "✅ Bağlı"
+                    results[name] = "✅ Connected"
                 else:
-                    results[name] = "❌ Model yüklenmedi"
+                    results[name] = "❌ Model not loaded"
             except Exception as e:
-                results[name] = f"❌ Hata: {str(e)[:50]}"
+                results[name] = f"❌ Error: {str(e)[:50]}"
         
         # AstraDB test
         try:
             if self.astra_collection:
                 test_results = list(self.astra_collection.find({}, limit=1))
-                results["AstraDB Native"] = f"✅ Bağlı ({len(test_results)} doküman)"
+                results["AstraDB Native"] = f"✅ Connected ({len(test_results)} documents)"
             else:
-                results["AstraDB Native"] = "❌ Collection başlatılmadı"
+                results["AstraDB Native"] = "❌ Collection not initialized"
         except Exception as e:
-            results["AstraDB Native"] = f"❌ Hata: {str(e)[:50]}"
+            results["AstraDB Native"] = f"❌ Error: {str(e)[:50]}"
         
         # CSV test
         try:
             if self.csv_data is not None:
-                results["CSV"] = f"✅ Yüklü ({len(self.csv_data)} satır)"
+                results["CSV"] = f"✅ Loaded ({len(self.csv_data)} rows)"
             else:
-                results["CSV"] = "❌ Yüklenmedi"
+                results["CSV"] = "❌ Not loaded"
         except Exception as e:
-            results["CSV"] = f"❌ Hata: {str(e)[:50]}"
+            results["CSV"] = f"❌ Error: {str(e)[:50]}"
         
         # Memory test
         try:
             self.memory.add_message("test_connection", "user", "test")
             history = self.memory.get_history("test_connection")
             if history:
-                results["Memory"] = "✅ Redis bağlı"
+                results["Memory"] = "✅ Redis connected"
             else:
-                results["Memory"] = "⚠️ Memory çalışıyor ama boş"
+                results["Memory"] = "⚠️ Memory working but empty"
         except Exception as e:
-            results["Memory"] = f"❌ Hata: {str(e)[:50]}"
+            results["Memory"] = f"❌ Error: {str(e)[:50]}"
         
         return results
