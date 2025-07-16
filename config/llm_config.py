@@ -31,11 +31,10 @@ class LLMConfig:
                 "max_tokens": self.max_tokens,
                 "max_retries": self.max_retries,
                 "timeout": self.timeout
-            
             }
         elif self.provider == LLMProvider.GOOGLE:
             return {
-                "google_api_key": os.getenv("GOOGLE_API_KEY"),  # DEĞIŞEN: api_key → google_api_key
+                "google_api_key": os.getenv("GOOGLE_API_KEY"),
                 "model": self.model,
                 "temperature": self.temperature,
                 "max_output_tokens": self.max_tokens,
@@ -48,7 +47,6 @@ class LLMConfig:
                 "model": self.model,
                 "temperature": self.temperature,
                 "max_tokens": self.max_tokens,
-                # DEĞIŞEN: max_retries ve timeout kaldırıldı (Claude desteklemiyor)
             }
     
     def get_fallback_config(self):
@@ -66,33 +64,20 @@ class LLMConfig:
 
 class LLMConfigs:
     """
-    Gelişmiş LLM konfigürasyonları - Fallback destekli
+    Güncellenmiş LLM konfigürasyonları - Smart Evaluator-Corrector ile
     """
     
-    # Google modelleri için timeout artırıldı, OpenAI fallback eklendi
-    EVALUATION = LLMConfig(
+    # YENİ: Birleştirilmiş Smart Evaluator-Corrector
+    SMART_EVALUATOR_CORRECTOR = LLMConfig(
         provider=LLMProvider.ANTHROPIC, 
-        model="claude-3-haiku-20240307", 
-        temperature=0.3, 
-        max_tokens=50, 
-        #timeout=45,  # Artırıldı
-        #max_retries=2,  # Azaltıldı
+        model="claude-3-5-sonnet-20241022",  # Daha güçlü model - complex task için
+        temperature=0.2,  # Düşük temperature - consistent output için
+        max_tokens=200,   # Artırıldı - context analysis için
         fallback_provider=LLMProvider.OPENAI,
         fallback_model="gpt-4o-mini"
     )
     
-    CORRECTION = LLMConfig(
-        provider=LLMProvider.GOOGLE, 
-        model="gemini-1.5-flash", 
-        temperature=0.1, 
-        max_tokens=150, 
-        timeout=45,  # Artırıldı
-        max_retries=2,
-        fallback_provider=LLMProvider.OPENAI,
-        fallback_model="gpt-4o-mini"
-    )
-    
-    # OpenAI modelleri stabil
+    # KALAN MODELLER - değişmedi
     SEARCH_OPTIMIZER = LLMConfig(
         provider=LLMProvider.OPENAI, 
         model="gpt-4o-mini", 
@@ -102,14 +87,11 @@ class LLMConfigs:
         max_retries=3
     )
     
-    # CSV Agent için kritik - Claude veya OpenAI fallback
     CSV_AGENT = LLMConfig(
         provider=LLMProvider.ANTHROPIC, 
         model="claude-3-5-sonnet-20241022", 
         temperature=0.3, 
         max_tokens=600, 
-       # timeout=100,
-       # max_retries=2,
         fallback_provider=LLMProvider.OPENAI,
         fallback_model="gpt-4o"
     )
@@ -133,7 +115,6 @@ class LLMFactory:
         """
         target_config = config
         
-        # Fallback istendi veya primary başarısız olduysa
         if use_fallback and config.get_fallback_config():
             target_config = config.get_fallback_config()
             logger.info(f"🔄 Fallback kullanılıyor: {target_config.provider.value} - {target_config.model}")
@@ -141,8 +122,6 @@ class LLMFactory:
         try:
             params = target_config.to_langchain_params()
             
-            # API key kontrolü
-            api_key = None
             if target_config.provider == LLMProvider.OPENAI:
                 api_key = params.get("api_key")
                 from langchain_openai import ChatOpenAI
@@ -151,7 +130,7 @@ class LLMFactory:
                 return ChatOpenAI(**params)
                 
             elif target_config.provider == LLMProvider.GOOGLE:
-                api_key = params.get("api_key")
+                api_key = params.get("google_api_key")
                 from langchain_google_genai import ChatGoogleGenerativeAI
                 if not api_key:
                     raise ValueError("GOOGLE_API_KEY bulunamadı")
@@ -177,12 +156,10 @@ class LLMFactory:
         Primary'yi dene, başarısız olursa fallback'i kullan
         """
         try:
-            # Önce primary'yi dene
             return LLMFactory.create_llm(config, use_fallback=False)
         except Exception as primary_error:
             logger.warning(f"⚠️ Primary LLM hatası: {primary_error}")
             
-            # Fallback varsa dene
             if config.get_fallback_config():
                 try:
                     logger.info(f"🔄 Fallback deneniyor...")
@@ -191,10 +168,9 @@ class LLMFactory:
                     logger.error(f"❌ Fallback de başarısız: {fallback_error}")
                     raise fallback_error
             else:
-                # Fallback yoksa primary error'ı raise et
                 raise primary_error
 
-# Diğer config'ler aynı kalıyor
+# Diğer config'ler aynı
 class VectorConfig:
     SIMILARITY_TOP_K = 3
     SEARCH_TYPE = "similarity"
