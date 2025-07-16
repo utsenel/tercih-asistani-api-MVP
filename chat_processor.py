@@ -335,7 +335,7 @@ class TercihAsistaniProcessor:
             return {"status": "UYGUN", "enhanced_question": message}
 
     async def process_message(self, message: str, session_id: str = "default") -> Dict[str, Any]:
-        """YENİ akış ile mesaj işleme"""
+        """YENİ akış ile mesaj işleme - Detaylı performans izleme"""
         start_time = time.time()
         
         try:
@@ -349,14 +349,14 @@ class TercihAsistaniProcessor:
             status = smart_result["status"]
             enhanced_question = smart_result["enhanced_question"]
             
-            if AppSettings.DETAILED_TIMING:
-                logger.debug(f"Smart Evaluator-Corrector: {smart_time:.2f}s, Status: {status}")
+            # DETAYLI PERFORMANS LOGGING
+            if os.getenv("DETAILED_TIMING", "false").lower() == "true":
+                logger.info(f"⏱️ Smart Evaluator: {smart_time:.2f}s, Status: {status}")
             
             # Adım 2: Koşullu yönlendirme
             if status == "KAPSAM_DIŞI":
                 total_time = time.time() - start_time
-                if AppSettings.PERFORMANCE_LOGGING:
-                    logger.info(f"Out of scope request completed in {total_time:.2f}s")
+                logger.info(f"Out of scope request completed in {total_time:.2f}s")
                 return {
                     "response": MessageSettings.ERROR_EXPERTISE_OUT,
                     "sources": []
@@ -364,8 +364,7 @@ class TercihAsistaniProcessor:
             
             if status == "SELAMLAMA":
                 total_time = time.time() - start_time
-                if AppSettings.PERFORMANCE_LOGGING:
-                    logger.info(f"Greeting request completed in {total_time:.2f}s")
+                logger.info(f"Greeting request completed in {total_time:.2f}s")
                 return {
                     "response": "Merhaba! Ben bir üniversite tercih asistanıyım. Size YKS tercihleri, bölüm seçimi, kariyer planlaması konularında yardımcı olabilirim. Hangi konuda bilgi almak istiyorsunuz?",
                     "sources": []
@@ -396,8 +395,9 @@ class TercihAsistaniProcessor:
             
             parallel_time = time.time() - parallel_start
             
-            if AppSettings.DETAILED_TIMING:
-                logger.debug(f"Parallel processing: {parallel_time:.2f}s")
+            # DETAYLI PERFORMANS LOGGING
+            if os.getenv("DETAILED_TIMING", "false").lower() == "true":
+                logger.info(f"⏱️ Parallel processing: {parallel_time:.2f}s")
             
             # Exception'ları handle et
             if isinstance(context1, Exception):
@@ -413,9 +413,6 @@ class TercihAsistaniProcessor:
             conversation_history = self.memory.get_history(session_id)
             memory_time = time.time() - memory_start
             
-            if AppSettings.DETAILED_TIMING:
-                logger.debug(f"Memory fetch: {memory_time:.3f}s")
-            
             # Adım 5: Final yanıt oluşturma - Enhanced question ile
             final_start = time.time()
             final_response = await self._generate_final_response_safe(
@@ -425,27 +422,38 @@ class TercihAsistaniProcessor:
                 history=conversation_history
             )
             final_time = time.time() - final_start
-            
-            if AppSettings.DETAILED_TIMING:
-                logger.debug(f"Final response generation: {final_time:.2f}s")
-
+    
             # Memory'ye kaydet - orijinal mesajı kaydet
             memory_save_start = time.time()
             self.memory.add_message(session_id, "user", message)  # Orijinal mesaj
             self.memory.add_message(session_id, "assistant", final_response)
             memory_save_time = time.time() - memory_save_start
-            
-            if AppSettings.DETAILED_TIMING:
-                logger.debug(f"Memory save: {memory_save_time:.3f}s")
-
-            # PERFORMANS RAPORU
+    
+            # PERFORMANS RAPORU - İYİLEŞTİRİLMİŞ
             total_time = time.time() - start_time
             
-            if AppSettings.PERFORMANCE_LOGGING:
-                if AppSettings.DETAILED_TIMING:
-                    logger.info(f"Request completed in {total_time:.2f}s (Smart: {smart_time:.2f}s, Parallel: {parallel_time:.2f}s, Final: {final_time:.2f}s)")
-                else:
-                    logger.info(f"Request completed in {total_time:.2f}s")
+            # DETAYLI TIMING SADECE DETAILED_TIMING=true OLDUĞUNDA
+            if os.getenv("DETAILED_TIMING", "false").lower() == "true":
+                logger.info(f"⏱️ DETAILED BREAKDOWN:")
+                logger.info(f"   🧠 Smart Evaluator: {smart_time:.2f}s")
+                logger.info(f"   🔄 Parallel (Vector+CSV): {parallel_time:.2f}s")
+                logger.info(f"   💾 Memory fetch: {memory_time:.3f}s")
+                logger.info(f"   🎯 Final response: {final_time:.2f}s")
+                logger.info(f"   💾 Memory save: {memory_save_time:.3f}s")
+                logger.info(f"   🎉 TOTAL: {total_time:.2f}s")
+                
+                # PERFORMANS UYARI SİSTEMİ
+                if total_time > 10:
+                    logger.warning(f"🐌 SLOW REQUEST: {total_time:.2f}s")
+                    if smart_time > 5:
+                        logger.warning(f"   🧠 Smart Evaluator slow: {smart_time:.2f}s")
+                    if parallel_time > 5:
+                        logger.warning(f"   🔄 Parallel processing slow: {parallel_time:.2f}s")
+                    if final_time > 3:
+                        logger.warning(f"   🎯 Final response slow: {final_time:.2f}s")
+            else:
+                # SADECE TOPLAM SÜRE
+                logger.info(f"Request completed in {total_time:.2f}s")
             
             return {
                 "response": final_response,
@@ -455,6 +463,7 @@ class TercihAsistaniProcessor:
                     **({
                         "smart_evaluator_time": round(smart_time, 2),
                         "parallel_time": round(parallel_time, 2),
+                        "final_time": round(final_time, 2),
                         "enhanced_question": enhanced_question,
                         "original_question": message,
                         "status": status
@@ -469,7 +478,7 @@ class TercihAsistaniProcessor:
                 "response": MessageSettings.ERROR_GENERAL,
                 "sources": [],
                 "metadata": {"error": str(e), "processing_time": round(total_time, 2)}
-            }
+            }                                            
 
     async def _get_vector_context_native(self, question: str) -> str:
         """Native AstraDB ile vector arama - Temizlenmiş"""
