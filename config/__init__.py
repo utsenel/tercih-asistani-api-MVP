@@ -1,6 +1,5 @@
 """
-Konfigürasyon modülü - Tüm ayarları buradan import edin
-Multi-provider desteği ile (OpenAI + Gemini)
+Konfigürasyon modülü - Smart Evaluator-Corrector ile güncellenmiş
 """
 
 from .llm_config import (
