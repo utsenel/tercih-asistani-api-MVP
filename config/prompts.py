@@ -5,46 +5,55 @@
 class PromptTemplates:
     """Optimize edilmiş prompt şablonları"""
     
-    # Soru Uygunluk Değerlendirmesi - Daha kesin ve hızlı
-    EVALUATION = """
-GÖREV: Gelen soruyu analiz et ve tercih rehberliği uygunluğunu değerlendir. Kararsız kalırsan uygun say.
+       # YENİ: Birleştirilmiş Smart Evaluator-Corrector
+    SMART_EVALUATOR_CORRECTOR = """
+GÖREV: Gelen soruyu önceki konuşma bağlamıyla değerlendirip optimize et.
 
+GEÇMIŞ KONUŞMA:
+{history}
+
+GÜNCEL SORU: {question}
+
+ADIM 1 - BAĞLAM ANALİZİ:
+• Önceki konuşmada spesifik bir bölüm/konu/meslek var mı?
+• Güncel soru önceki konuşmayla ilişkili mi? ("peki", "o zaman", "bunun" gibi bağlayıcılar)
+• Eksik referans var mı? ("onun maaşı", "bu bölümde", "orada" gibi)
+
+ADIM 2 - UYGUNLUK DEĞERLENDİRMESİ:
 KAPSAM DAHİLİ:
-• Üniversite/bölüm tercihi, sıralama
-• YKS/TYT/AYT sınavları  
-• Kariyer/meslek bilgisi
-• İstihdam/maaş verileri
+• Üniversite/bölüm tercihi, sıralama, karşılaştırma
+• YKS/TYT/AYT sınavları, puan türleri
+• Kariyer/meslek bilgisi, gelecek planları
+• İstihdam/maaş verileri, iş imkanları
 • Eğitim süreci/kampüs yaşamı
 • Burs/öğrenci imkanları
 
 KAPSAM DIŞI:
 • Genel sohbet, gündelik konular
-• Teknik sorunlar
-• Kişisel/aile meseleleri  
-• Siyasi görüşler
+• Teknik sorunlar, sistem hataları
+• Kişisel/aile meseleleri
+• Siyasi görüşler, ideolojik konular
 
-ÇIKTI (sadece aşağıdakilerden biri):
-- UYGUN
-- SELAMLAMA  
-- KAPSAM_DIŞI
+SELAMLAMA İNDİKATÖRLERİ:
+• "merhaba", "selam", "iyi günler", "nasılsın"
+• "yardım", "neler yapabilirsin", "kimsin"
 
-Soru: {question}
-Değerlendirme:"""
+ADIM 3 - SORU OPTİMİZASYONU:
+• Bağlamsal bilgiyi soruya entegre et (bölüm adı, meslek, önceki konu)
+• Yazım hatalarını düzelt, kısaltmaları aç
+• Belirsizlikleri gider, eksik referansları tamamla
+• Tercih rehberliği terminolojisini kullan
 
-    # Soru Düzeltme - Daha odaklanmış
-    CORRECTION = """
-GÖREV: Gelen soruyu tercih rehberliği sistemi için optimize et.
+ÇIKTI FORMATI (kesinlikle bu formatta):
+STATUS: [UYGUN/SELAMLAMA/KAPSAM_DIŞI]
+ENHANCED_QUESTION: [Context-aware düzeltilmiş soru]
 
-YAPILACAKLAR:
-1. Yazım hatalarını düzelt
-2. Kısaltmaları aç (üni→üniversite, YKS→Yükseköğretim Kurumları Sınavı)
-3. Cümle yapısını netleştir
-4. Eksik bilgileri tamamla
-
-ÇIKTI: Sadece düzeltilmiş soru (açıklama yok)
-
-Orijinal: {question}
-Düzeltilmiş:"""
+ÖRNEK:
+Geçmiş: "user: bilgisayar mühendisliği nasıl bir bölüm?"
+Güncel: "peki maaşları nasıl?"
+STATUS: UYGUN
+ENHANCED_QUESTION: Bilgisayar mühendisliği mezunlarının maaş durumu ve gelir seviyeleri nasıl?
+"""
 
     # Vector Arama - Daha etkili anahtar kelime genişletme
     SEARCH_OPTIMIZER = """
