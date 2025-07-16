@@ -50,12 +50,14 @@ class LLMFactory:
 
 class TercihAsistaniProcessor:
     """
-    Paralel işleme ve detaylı logging ile geliştirilmiş processor
+    Güncellenmiş processor - Smart Evaluator-Corrector ile
     """
     
     def __init__(self):
-        self.llm_evaluation = None
-        self.llm_correction = None
+        # YENİ: Smart Evaluator-Corrector
+        self.llm_smart_evaluator_corrector = None
+        
+        # KALAN LLM'LER - eski evaluation ve correction kaldırıldı
         self.llm_search_optimizer = None
         self.llm_csv_agent = None
         self.llm_final = None
@@ -68,9 +70,12 @@ class TercihAsistaniProcessor:
         self.csv_data = None
         self.memory = ConversationMemory() 
         
-        # Config'lerden prompt'ları al
-        self.evaluation_prompt = ChatPromptTemplate.from_template(PromptTemplates.EVALUATION)
-        self.correction_prompt = ChatPromptTemplate.from_template(PromptTemplates.CORRECTION)
+        # YENİ PROMPT
+        self.smart_evaluator_corrector_prompt = ChatPromptTemplate.from_template(
+            PromptTemplates.SMART_EVALUATOR_CORRECTOR
+        )
+        
+        # KALAN PROMPT'LAR - değişmedi
         self.search_optimizer_prompt = ChatPromptTemplate.from_template(PromptTemplates.SEARCH_OPTIMIZER)
         self.csv_agent_prompt = ChatPromptTemplate.from_template(PromptTemplates.CSV_AGENT)
         self.final_prompt = ChatPromptTemplate.from_template(PromptTemplates.FINAL_RESPONSE)
@@ -87,8 +92,35 @@ class TercihAsistaniProcessor:
             logger.error(f"❌ Embedding oluşturma hatası: {e}")
             raise
 
+    def _get_recent_history(self, session_id: str, limit: int = 4) -> str:
+        """Son N mesajı al - Smart Evaluator için"""
+        try:
+            if not self.memory:
+                return ""
+            
+            # Memory'den son mesajları al
+            full_history = self.memory.get_history(session_id, limit=limit)
+            
+            if not full_history:
+                return ""
+            
+            # Son 2-3 mesaj çiftini al (user-assistant pairs)
+            lines = full_history.strip().split('\n')
+            recent_lines = lines[-4:] if len(lines) >= 4 else lines  # Son 4 satır (2 mesaj çifti)
+            
+            recent_history = '\n'.join(recent_lines)
+            
+            logger.info(f"📜 Recent history alındı: {len(recent_history)} karakter")
+            logger.info(f"   İçerik: '{recent_history[:100]}...'")
+            
+            return recent_history
+            
+        except Exception as e:
+            logger.error(f"❌ Recent history alma hatası: {e}")
+            return ""
+
     async def initialize(self):
-        """Gelişmiş hata yönetimi ile başlatma"""
+        """Güncellenmiş başlatma - Smart Evaluator ile"""
         try:
             logger.info("🚀 TercihAsistaniProcessor başlatılıyor...")
             
@@ -98,8 +130,8 @@ class TercihAsistaniProcessor:
             # OpenAI client'ı başlat
             self._initialize_openai_client()
             
-            # LLM'leri sıralı başlat (fallback ile)
-            await self._initialize_llms()
+            # YENİ LLM'leri sıralı başlat
+            await self._initialize_llms_new()
             
             # AstraDB bağlantısını native API ile başlat
             await self._initialize_astradb_native()
@@ -141,11 +173,10 @@ class TercihAsistaniProcessor:
             logger.error(f"❌ OpenAI client hatası: {e}")
             raise
 
-    async def _initialize_llms(self):
-        """Fallback stratejisi ile LLM'leri başlat"""
+    async def _initialize_llms_new(self):
+        """YENİ LLM başlatma - Smart Evaluator ile"""
         llm_configs = {
-            "evaluation": LLMConfigs.EVALUATION,
-            "correction": LLMConfigs.CORRECTION, 
+            "smart_evaluator_corrector": LLMConfigs.SMART_EVALUATOR_CORRECTOR,
             "search_optimizer": LLMConfigs.SEARCH_OPTIMIZER,
             "csv_agent": LLMConfigs.CSV_AGENT,
             "final": LLMConfigs.FINAL_RESPONSE
@@ -161,7 +192,7 @@ class TercihAsistaniProcessor:
                 logger.error(f"❌ {name} LLM hatası: {e}")
                 
                 # Critical LLM'ler için fallback
-                if name in ["csv_agent", "final"]:
+                if name in ["smart_evaluator_corrector", "csv_agent", "final"]:
                     logger.warning(f"🔄 {name} için OpenAI fallback...")
                     fallback_config = LLMConfigs.FINAL_RESPONSE  # OpenAI model
                     try:
@@ -233,30 +264,109 @@ class TercihAsistaniProcessor:
             logger.error(f"❌ CSV yükleme hatası: {e}")
             self.csv_data = None
 
+    async def _smart_evaluate_and_correct(self, message: str, session_id: str) -> Dict[str, str]:
+        """YENİ: Smart Evaluator-Corrector fonksiyonu"""
+        try:
+            smart_start = time.time()
+            
+            if not self.llm_smart_evaluator_corrector:
+                logger.warning("⚠️ Smart Evaluator-Corrector LLM mevcut değil, fallback")
+                return {
+                    "status": "UYGUN",
+                    "enhanced_question": message
+                }
+            
+            # Son birkaç mesajı al
+            recent_history = self._get_recent_history(session_id, limit=4)
+            
+            logger.info(f"🧠 SMART EVALUATOR-CORRECTOR başlatılıyor:")
+            logger.info(f"   📝 Orijinal mesaj: '{message[:50]}...'")
+            logger.info(f"   📜 History: {len(recent_history)} karakter")
+            
+            # Smart Evaluator-Corrector'a gönder
+            result = await self.llm_smart_evaluator_corrector.ainvoke(
+                self.smart_evaluator_corrector_prompt.format(
+                    question=message,
+                    history=recent_history
+                )
+            )
+            
+            response = result.content.strip()
+            smart_time = time.time() - smart_start
+            
+            logger.info(f"🤖 Smart Evaluator-Corrector raw response ({smart_time:.2f}s):")
+            logger.info(f"   📄 Raw output: '{response[:150]}...'")
+            
+            # Response'u parse et
+            try:
+                # STATUS ve ENHANCED_QUESTION'u extract et
+                status_match = re.search(r'STATUS:\s*(\w+)', response)
+                question_match = re.search(r'ENHANCED_QUESTION:\s*(.+)', response, re.DOTALL)
+                
+                if status_match and question_match:
+                    status = status_match.group(1).strip()
+                    enhanced_question = question_match.group(1).strip()
+                    
+                    logger.info(f"✅ PARSE BAŞARILI:")
+                    logger.info(f"   📊 Status: {status}")
+                    logger.info(f"   📝 Enhanced Q: '{enhanced_question[:80]}...'")
+                    
+                    return {
+                        "status": status,
+                        "enhanced_question": enhanced_question
+                    }
+                else:
+                    logger.warning("⚠️ Parse başarısız - format hatası")
+                    logger.warning(f"   Status match: {bool(status_match)}")
+                    logger.warning(f"   Question match: {bool(question_match)}")
+                    
+                    # Fallback parsing
+                    if "UYGUN" in response.upper():
+                        return {"status": "UYGUN", "enhanced_question": message}
+                    elif "SELAMLAMA" in response.upper():
+                        return {"status": "SELAMLAMA", "enhanced_question": message}
+                    else:
+                        return {"status": "KAPSAM_DIŞI", "enhanced_question": message}
+                        
+            except Exception as parse_error:
+                logger.error(f"❌ Parse hatası: {parse_error}")
+                return {"status": "UYGUN", "enhanced_question": message}
+            
+        except Exception as e:
+            smart_time = time.time() - smart_start
+            logger.error(f"❌ Smart Evaluator-Corrector hatası ({smart_time:.2f}s): {e}")
+            return {"status": "UYGUN", "enhanced_question": message}
+
     async def process_message(self, message: str, session_id: str = "default") -> Dict[str, Any]:
-        """Gelişmiş paralel işleme ve detaylı logging ile mesaj işleme"""
+        """YENİ akış ile mesaj işleme"""
         start_time = time.time()
         
         try:
             logger.info(f"📨 Mesaj işleniyor - Session: {session_id}")
             logger.info(f"📝 Gelen mesaj: '{message[:100]}...' ({len(message)} karakter)")
             
-            # Adım 1: Soru uygunluk değerlendirmesi
-            eval_start = time.time()
-            evaluation_result = await self._evaluate_question_safe(message)
-            eval_time = time.time() - eval_start
-            logger.info(f"⏱️ Evaluation süresi: {eval_time:.2f}s")
+            # Adım 1: YENİ Smart Evaluator-Corrector
+            smart_start = time.time()
+            smart_result = await self._smart_evaluate_and_correct(message, session_id)
+            smart_time = time.time() - smart_start
+            
+            status = smart_result["status"]
+            enhanced_question = smart_result["enhanced_question"]
+            
+            logger.info(f"⏱️ Smart Evaluator-Corrector süresi: {smart_time:.2f}s")
+            logger.info(f"📊 Status: {status}")
+            logger.info(f"📝 Enhanced Question: '{enhanced_question[:100]}...'")
             
             # Adım 2: Koşullu yönlendirme
-            if evaluation_result == "Uzmanlık dışı soru":
+            if status == "KAPSAM_DIŞI":
                 total_time = time.time() - start_time
-                logger.info(f"🚫 Uzmanlık dışı soru - Toplam süre: {total_time:.2f}s")
+                logger.info(f"🚫 Kapsam dışı soru - Toplam süre: {total_time:.2f}s")
                 return {
                     "response": MessageSettings.ERROR_EXPERTISE_OUT,
                     "sources": []
                 }
             
-            if evaluation_result == "SELAMLAMA":
+            if status == "SELAMLAMA":
                 total_time = time.time() - start_time
                 logger.info(f"👋 Selamlama algılandı - Toplam süre: {total_time:.2f}s")
                 return {
@@ -264,26 +374,19 @@ class TercihAsistaniProcessor:
                     "sources": []
                 }
             
-            # Adım 3: Soru düzeltme
-            correction_start = time.time()
-            corrected_question = await self._correct_question_safe(message)
-            correction_time = time.time() - correction_start
-            logger.info(f"⏱️ Correction süresi: {correction_time:.2f}s")
-            logger.info(f"📝 Düzeltilmiş soru: '{corrected_question}'")
-            
-            # Adım 4: PARALEL İŞLEMLER - Task'lar ile force et
+            # Adım 3: PARALEL İŞLEMLER - Enhanced question ile
             parallel_start = time.time()
             logger.info("🔄 Paralel işlemler başlatılıyor...")
             
-            # Task'ları oluştur (gerçek paralel çalışma için)
+            # Task'ları oluştur
             vector_task = asyncio.create_task(
-                self._get_vector_context_native(corrected_question)
+                self._get_vector_context_native(enhanced_question)
             )
             csv_task = asyncio.create_task(
-                self._get_csv_context_safe(corrected_question)
+                self._get_csv_context_safe(enhanced_question)
             )
             
-            # Paralel yürütme (exception handling ile)
+            # Paralel yürütme
             try:
                 context1, context2 = await asyncio.gather(
                     vector_task, 
@@ -308,24 +411,19 @@ class TercihAsistaniProcessor:
                 context2 = "CSV analizi başarısız"
             
             # Context detaylarını logla
-            logger.info(f"📄 CONTEXT1 (Vector) - {len(context1)} karakter:")
-            logger.info(f"   İlk 200 karakter: '{context1[:500]}...'")
+            logger.info(f"📄 CONTEXT1 (Vector) - {len(context1)} karakter")
+            logger.info(f"📊 CONTEXT2 (CSV) - {len(context2)} karakter")
             
-            logger.info(f"📊 CONTEXT2 (CSV) - {len(context2)} karakter:")
-            logger.info(f"   İlk 200 karakter: '{context2[:200]}...'")
-            
-            # Adım 5: Memory'den geçmiş al
+            # Adım 4: Memory'den geçmiş al
             memory_start = time.time()
             conversation_history = self.memory.get_history(session_id)
             memory_time = time.time() - memory_start
             logger.info(f"🧠 Memory geçmişi alındı ({memory_time:.3f}s): {len(conversation_history)} karakter")
-            if conversation_history:
-                logger.info(f"   Geçmiş özet: '{conversation_history[:100]}...'")
             
-            # Adım 6: Final yanıt oluşturma
+            # Adım 5: Final yanıt oluşturma - Enhanced question ile
             final_start = time.time()
             final_response = await self._generate_final_response_safe(
-                question=corrected_question,
+                question=enhanced_question,  # Enhanced question kullan
                 context1=context1,
                 context2=context2,
                 history=conversation_history
@@ -333,11 +431,10 @@ class TercihAsistaniProcessor:
             final_time = time.time() - final_start
             logger.info(f"⏱️ Final response süresi: {final_time:.2f}s")
             logger.info(f"✅ Final yanıt: {len(final_response)} karakter")
-            logger.info(f"   İlk 150 karakter: '{final_response[:150]}...'")
 
-            # Memory'ye kaydet
+            # Memory'ye kaydet - orijinal mesajı kaydet
             memory_save_start = time.time()
-            self.memory.add_message(session_id, "user", message)
+            self.memory.add_message(session_id, "user", message)  # Orijinal mesaj
             self.memory.add_message(session_id, "assistant", final_response)
             memory_save_time = time.time() - memory_save_start
             logger.info(f"💾 Memory kayıt tamamlandı ({memory_save_time:.3f}s)")
@@ -345,30 +442,23 @@ class TercihAsistaniProcessor:
             # PERFORMANS RAPORU
             total_time = time.time() - start_time
             logger.info(f"📈 PERFORMANS RAPORU:")
-            logger.info(f"   ⚡ Evaluation: {eval_time:.2f}s")
-            logger.info(f"   ✏️  Correction: {correction_time:.2f}s")
+            logger.info(f"   🧠 Smart Evaluator-Corrector: {smart_time:.2f}s")
             logger.info(f"   🔄 Paralel İşlemler: {parallel_time:.2f}s")
             logger.info(f"   🧠 Memory: {memory_time:.3f}s")
             logger.info(f"   🎯 Final Response: {final_time:.2f}s")
             logger.info(f"   💾 Memory Save: {memory_save_time:.3f}s")
             logger.info(f"   🎉 TOPLAM: {total_time:.2f}s")
             
-            # Performance warning
-            if total_time > 15:
-                logger.warning(f"⚠️ Yavaş yanıt: {total_time:.2f}s > 15s!")
-            elif total_time > 8:
-                logger.info(f"⚠️ Ortalama yanıt: {total_time:.2f}s")
-            else:
-                logger.info(f"✅ Hızlı yanıt: {total_time:.2f}s")
-
             return {
                 "response": final_response,
                 "sources": self._extract_sources(context1, context2),
                 "metadata": {
                     "processing_time": round(total_time, 2),
+                    "smart_evaluator_time": round(smart_time, 2),
                     "parallel_time": round(parallel_time, 2),
-                    "context1_length": len(context1),
-                    "context2_length": len(context2)
+                    "enhanced_question": enhanced_question,
+                    "original_question": message,
+                    "status": status
                 }
             }
             
@@ -381,60 +471,8 @@ class TercihAsistaniProcessor:
                 "metadata": {"error": str(e), "processing_time": round(total_time, 2)}
             }
 
-    async def _evaluate_question_safe(self, question: str) -> str:
-        """Güvenli soru değerlendirme"""
-        try:
-            if not self.llm_evaluation:
-                logger.warning("⚠️ Evaluation LLM mevcut değil, varsayılan UYGUN")
-                return "UYGUN"
-                
-            result = await self.llm_evaluation.ainvoke(
-                self.evaluation_prompt.format(question=question)
-            )
-            evaluation_result = result.content.strip()
-            
-            # Detaylı evaluation logging
-            logger.info(f"🔍 EVALUATION SONUCU:")
-            logger.info(f"   Ham çıktı: '{evaluation_result[:100]}...'")
-            
-            if "SELAMLAMA" in evaluation_result.upper():
-                logger.info(f"   ✅ Karar: SELAMLAMA")
-                return "SELAMLAMA"
-            elif "UYGUN" in evaluation_result.upper():
-                logger.info(f"   ✅ Karar: UYGUN")
-                return "UYGUN"
-            else:
-                logger.info(f"   ❌ Karar: Uzmanlık dışı")
-                return "Uzmanlık dışı soru"
-                
-        except Exception as e:
-            logger.error(f"❌ Değerlendirme hatası: {e}")
-            return "UYGUN"  # Güvenli varsayılan
-
-    async def _correct_question_safe(self, question: str) -> str:
-        """Güvenli soru düzeltme"""
-        try:
-            if not self.llm_correction:
-                logger.warning("⚠️ Correction LLM mevcut değil, orijinal soru döndürülüyor")
-                return question
-                
-            result = await self.llm_correction.ainvoke(
-                self.correction_prompt.format(question=question)
-            )
-            corrected = result.content.strip()
-            
-            # Detaylı correction logging
-            logger.info(f"✏️ CORRECTION SONUCU:")
-            logger.info(f"   Orijinal: '{question[:80]}...'")
-            logger.info(f"   Düzeltilmiş: '{corrected[:80]}...'")
-            
-            return corrected
-        except Exception as e:
-            logger.error(f"❌ Düzeltme hatası: {e}")
-            return question
-
     async def _get_vector_context_native(self, question: str) -> str:
-        """Native AstraDB ile vector arama - DÜZELTILMIŞ VERSİYON"""
+        """Native AstraDB ile vector arama"""
         try:
             vector_start = time.time()
             
@@ -444,7 +482,7 @@ class TercihAsistaniProcessor:
             
             logger.info(f"🔍 Native vector arama başlatılıyor: {question[:50]}...")
             
-            # Search query optimize et (eğer mümkünse)
+            # Search query optimize et
             search_text = question
             if self.llm_search_optimizer:
                 try:
@@ -464,61 +502,26 @@ class TercihAsistaniProcessor:
                 logger.error(f"❌ Embedding oluşturma hatası: {e}")
                 return "Embedding oluşturulamadı"
             
-            # ÖNCE VERİ YAPISINI ANLA - Sample document çek (GENİŞLETİLMİŞ PROJECTION)
-            try:
-                sample_doc = list(self.astra_collection.find({}, limit=1, projection={
-                    "$vectorize": 1,  # ANA CONTENT FIELD - YENİ!
-                    "text": 1, 
-                    "content": 1, 
-                    "page_content": 1,
-                    "body": 1,
-                    "document": 1,
-                    "metadata": 1,
-                    "source": 1,
-                    "file_path": 1,
-                    "_id": 1
-                }))
-                
-                if sample_doc:
-                    logger.info(f"📋 SAMPLE DOCUMENT STRUCTURE:")
-                    logger.info(f"   Keys: {list(sample_doc[0].keys())}")
-                    for key, value in sample_doc[0].items():
-                        if key == '$vector':
-                            logger.info(f"   {key}: Vector data ({len(value) if isinstance(value, list) else 'N/A'} dimensions)")
-                        elif key == '$vectorize':  # YENİ - bu ana content olabilir
-                            logger.info(f"   {key}: '{str(value)[:200]}...' ({len(str(value))} karakter)")
-                        elif isinstance(value, str):
-                            logger.info(f"   {key}: '{value[:100]}...' ({len(value)} karakter)")
-                        else:
-                            logger.info(f"   {key}: {type(value)} = {str(value)[:100]}...")
-                    
-            except Exception as sample_error:
-                logger.warning(f"⚠️ Sample doc çekme hatası: {sample_error}")
-            
-            # Native vector search - GENİŞLETİLMİŞ PROJECTION ile
+            # Native vector search
             try:
                 search_results = self.astra_collection.find(
-                    {},  # Empty filter - tüm belgelerden ara
-                    sort={"$vector": query_embedding},  # Vector similarity sort
+                    {},
+                    sort={"$vector": query_embedding},
                     limit=VectorConfig.SIMILARITY_TOP_K,
                     projection={
-                        # ANA CONTENT FIELD - YENİ!
-                        "$vectorize": 1,  # Bu muhtemelen asıl content
-                        # Diğer olası content fields
+                        "$vectorize": 1,
                         "text": 1, 
                         "content": 1, 
                         "page_content": 1,
                         "body": 1,
                         "document": 1,
-                        # Metadata
                         "metadata": 1,
                         "source": 1,
                         "file_path": 1,
-                        "_id": 1  # Debug için
+                        "_id": 1
                     }
                 )
                 
-                # Results'ı listeye çevir
                 docs = list(search_results)
                 logger.info(f"📄 Bulunan doküman sayısı: {len(docs)}")
                 
@@ -526,64 +529,33 @@ class TercihAsistaniProcessor:
                     logger.warning("❌ Hiç doküman bulunamadı")
                     return "İlgili doküman bulunamadı"
                 
-                # DETAYLI VERİ ANALİZİ - $vectorize'a özel dikkat
-                for i, doc in enumerate(docs):
-                    logger.info(f"🔍 DOC {i+1} ANALİZİ:")
-                    logger.info(f"   Available keys: {list(doc.keys())}")
-                    
-                    # $vectorize field'ına özel dikkat
-                    if '$vectorize' in doc:
-                        vectorize_content = doc['$vectorize']
-                        logger.info(f"   💎 $vectorize BULUNDU: {type(vectorize_content)} - {len(str(vectorize_content))} karakter")
-                        logger.info(f"       İçerik: '{str(vectorize_content)[:200]}...'")
-                    
-                    # Diğer field'ları da kontrol et
-                    for key, value in doc.items():
-                        if key == '$vectorize':
-                            continue  # Yukarıda işledik
-                        elif isinstance(value, str) and len(value) > 10:
-                            logger.info(f"   {key}: '{value[:150]}...' ({len(value)} karakter)")
-                        else:
-                            logger.info(f"   {key}: {type(value)} - {str(value)[:100]}")
-                
-                # Doküman içeriklerini birleştir - $vectorize'ı ÖNCELİKLE KULLAN
+                # Doküman içeriklerini birleştir
                 context_parts = []
                 total_chars = 0
                 
                 for i, doc in enumerate(docs):
                     try:
-                        # ÖNCE $vectorize'ı dene - bu asıl content olabilir
+                        # İçerik al
                         content = None
                         content_source = None
                         
                         if '$vectorize' in doc and doc['$vectorize']:
                             content = str(doc['$vectorize']).strip()
                             content_source = '$vectorize'
-                            logger.info(f"✅ Doküman {i+1} - $vectorize field'ından content alındı")
                         else:
-                            # Fallback: Diğer possible content fields
+                            # Fallback fields
                             possible_content_fields = ['text', 'content', 'page_content', 'body', 'document']
-                            
                             for field in possible_content_fields:
                                 if field in doc and doc[field]:
                                     content = str(doc[field]).strip()
                                     content_source = field
-                                    logger.info(f"✅ Doküman {i+1} - '{field}' field'ından content alındı")
                                     break
                         
                         if not content:
-                            logger.warning(f"⚠️ Doküman {i+1} - hiçbir content field'ında veri yok")
-                            # DEBUG: Mevcut tüm field'ları logla
-                            logger.warning(f"   Mevcut fields: {list(doc.keys())}")
-                            for key, value in doc.items():
-                                if isinstance(value, str) and len(value) > 0:
-                                    logger.warning(f"   {key}: '{str(value)[:100]}...'")
                             continue
                         
-                        # Metadata'dan kaynak bilgisini al
+                        # Kaynak bilgisi
                         source = "Bilinmeyen kaynak"
-                        
-                        # Farklı source field'larını dene
                         if 'metadata' in doc and isinstance(doc['metadata'], dict):
                             metadata = doc['metadata']
                             source = metadata.get('source', metadata.get('file_path', metadata.get('filename', source)))
@@ -592,14 +564,13 @@ class TercihAsistaniProcessor:
                         elif 'file_path' in doc:
                             source = doc['file_path']
                         
-                        # İçeriği kısalt (daha fazla content için limit artırıldı)
-                        if len(content) > 800:  # 500'den 800'e çıkarıldı
+                        # İçeriği kısalt
+                        if len(content) > 800:
                             content = content[:800] + "..."
                         
                         # Kaynak formatını düzelt
                         if isinstance(source, str):
                             source_name = source.split('/')[-1] if '/' in source else source
-                            # UTF-8 encoding problemi düzeltmesi
                             if any(char in source_name for char in ['Ä°', 'ZÃ', 'Ã', 'Â']):
                                 source_name = "İZÜ YKS Tercih Rehberi.pdf"
                             if not source_name or source_name == "Bilinmeyen kaynak":
@@ -610,9 +581,8 @@ class TercihAsistaniProcessor:
                         context_parts.append(f"**Kaynak**: {source_name}\n**İçerik**: {content}")
                         total_chars += len(content)
                         
-                        logger.info(f"✅ Doküman {i+1} işlendi: {source_name} - {len(content)} karakter (kaynak: {content_source})")
+                        logger.info(f"✅ Doküman {i+1} işlendi: {source_name} - {len(content)} karakter")
                         
-                        # Maximum 2000 karakter sınırı (artırıldı)
                         if total_chars > 2000:
                             break
                             
@@ -622,20 +592,7 @@ class TercihAsistaniProcessor:
                 
                 if not context_parts:
                     logger.error("❌ Hiçbir doküman işlenemedi!")
-                    
-                    # EXTENDED DEBUG: Tüm dokümanları detaylı logla
-                    logger.error("🔍 EXTENDED DEBUGGING - TÜM DOKÜMANLARIN İÇERİĞİ:")
-                    for i, doc in enumerate(docs):
-                        logger.error(f"   DOKÜMAN {i+1}:")
-                        for key, value in doc.items():
-                            if isinstance(value, str):
-                                logger.error(f"     {key}: '{value[:300]}...' ({len(value)} chars)")
-                            elif isinstance(value, dict):
-                                logger.error(f"     {key}: {value}")
-                            else:
-                                logger.error(f"     {key}: {type(value)} = {str(value)[:200]}")
-                    
-                    return "Dokümanlar işlenemedi - veri yapısı sorunu"
+                    return "Dokümanlar işlenemedi"
                 
                 final_context = "\n\n".join(context_parts)
                 vector_time = time.time() - vector_start
@@ -643,7 +600,6 @@ class TercihAsistaniProcessor:
                 logger.info(f"✅ NATIVE VECTOR ARAMA TAMAMLANDI ({vector_time:.2f}s):")
                 logger.info(f"   📄 İşlenen doküman: {len(context_parts)} adet")
                 logger.info(f"   📝 Toplam context: {len(final_context)} karakter")
-                logger.info(f"   📄 Context önizleme: '{final_context[:300]}...'")
                 
                 return final_context
                     
@@ -655,74 +611,9 @@ class TercihAsistaniProcessor:
             vector_time = time.time() - vector_start
             logger.error(f"❌ Vector context genel hatası ({vector_time:.2f}s): {e}")
             return "Vector arama genel hatası"
-    
-    async def debug_astra_documents(self) -> Dict[str, Any]:
-        """AstraDB doküman yapısını debug et"""
-        try:
-            if not self.astra_collection:
-                return {"status": "error", "message": "AstraDB collection mevcut değil"}
-            
-            logger.info("🔍 ASTRA DOKÜMAN YAPISI DEBUG...")
-            
-            # İlk 3 dokümanı çek
-            sample_docs = list(self.astra_collection.find({}, limit=3))
-            
-            debug_info = {
-                "total_documents": len(sample_docs),
-                "sample_documents": []
-            }
-            
-            for i, doc in enumerate(sample_docs):
-                doc_info = {
-                    "document_id": i + 1,
-                    "available_fields": list(doc.keys()),
-                    "field_analysis": {}
-                }
-                
-                # Her field'ı analiz et
-                for key, value in doc.items():
-                    if key == '$vector':
-                        doc_info["field_analysis"][key] = {
-                            "type": type(value).__name__,
-                            "length": len(value) if isinstance(value, (list, str)) else "N/A",
-                            "sample": "Vector data (hidden)"
-                        }
-                    elif isinstance(value, str):
-                        doc_info["field_analysis"][key] = {
-                            "type": "string",
-                            "length": len(value),
-                            "sample": value[:200] + "..." if len(value) > 200 else value,
-                            "has_content": len(value.strip()) > 0
-                        }
-                    elif isinstance(value, dict):
-                        doc_info["field_analysis"][key] = {
-                            "type": "dict",
-                            "keys": list(value.keys()),
-                            "sample": str(value)[:200] + "..." if len(str(value)) > 200 else str(value)
-                        }
-                    else:
-                        doc_info["field_analysis"][key] = {
-                            "type": type(value).__name__,
-                            "sample": str(value)[:100]
-                        }
-                
-                debug_info["sample_documents"].append(doc_info)
-                
-                # Log her doküman için
-                logger.info(f"📄 DOKÜMAN {i+1}:")
-                logger.info(f"   Available fields: {list(doc.keys())}")
-                for key, analysis in doc_info["field_analysis"].items():
-                    if key != '$vector':
-                        logger.info(f"   {key}: {analysis}")
-            
-            return {"status": "success", "debug_info": debug_info}
-            
-        except Exception as e:
-            logger.error(f"❌ Astra debug hatası: {e}")
-            return {"status": "error", "message": str(e)}
 
     async def _get_csv_context_safe(self, question: str) -> str:
-        """CSV analiz - HIZLANDIRILMIŞ VE GÜVENLİ VERSİYON + DEBUG"""
+        """CSV analiz - Enhanced question ile"""
         try:
             csv_start = time.time()
             
@@ -731,14 +622,12 @@ class TercihAsistaniProcessor:
                 return "CSV verileri mevcut değil"
     
             question_lower = question.lower()
-            logger.info(f"🔍 CSV DEBUG - Gelen soru: '{question_lower}'")
+            logger.info(f"🔍 CSV analizi: '{question_lower[:50]}...'")
             
-            # HIZLI ÖN KONTROL - CSV anahtar kelimesi var mı?
+            # CSV anahtar kelimesi kontrolü
             csv_keywords = [
                 "istihdam", "maaş", "gelir", "sektör", "firma", "çalışma", "iş", 
                 "girişim", "başlama", "oran", "yüzde", "istatistik", "veri",
-                "employment", "salary", "sector", "startup", "rate", "percentage",
-                # BÖLÜM ADLARI DA EKLENMELI - ÖNEMLİ!
                 "bilgisayar", "mühendislik", "tıp", "hukuk", "ekonomi", "matematik",
                 "fizik", "kimya", "makine", "elektrik", "endüstri"
             ]
@@ -747,142 +636,96 @@ class TercihAsistaniProcessor:
             logger.info(f"🔍 CSV Keywords check: {csv_required}")
             
             if not csv_required:
-                logger.info("⚡ CSV analizi atlandı - anahtar kelime yok")
-                return "CSV analizi gerekli değil - genel rehberlik sorusu"
+                logger.info("⚡ CSV analizi atlandı")
+                return "CSV analizi gerekli değil"
     
-            logger.info("📊 CSV analizi gerekli - detaylı analiz başlatılıyor")
-    
-            # Bölüm adını bul - İYİLEŞTİRİLMİŞ MATCHING
+            # Bölüm adını bul
             bolum_adi = None
             
-            # Önce tam eşleşme ara
             for bolum in self.csv_data['bolum_adi'].unique():
                 if bolum.lower() in question_lower:
                     bolum_adi = bolum
-                    logger.info(f"🎯 TAM EŞLEŞME bulundu: {bolum_adi}")
                     break
             
-            # Tam eşleşme yoksa kısmi eşleşme ara
             if not bolum_adi:
                 for bolum in self.csv_data['bolum_adi'].unique():
                     bolum_words = bolum.lower().split()
                     if any(word in question_lower for word in bolum_words if len(word) > 3):
                         bolum_adi = bolum
-                        logger.info(f"🎯 KISMI EŞLEŞME bulundu: {bolum_adi}")
                         break
     
-            # Spesifik bölüm sorgusu varsa detaylı analiz
+            # Spesifik bölüm analizi
             if bolum_adi:
                 logger.info(f"📋 Spesifik bölüm analizi: {bolum_adi}")
                 
-                # Filtreli analiz
                 filtered = self.csv_data[self.csv_data['bolum_adi'] == bolum_adi]
                 
                 if filtered.empty:
-                    logger.warning(f"⚠️ {bolum_adi} için veri bulunamadı")
                     return f"{bolum_adi} için veri bulunamadı"
                 
-                # İlgili metrikleri belirle - GENİŞLETİLMİŞ
-                metrik_cols = []
+                # Metrik sütunlarını belirle
+                metrik_cols = ["istihdam_orani", "girisimcilik_orani", "ortalama_calisma_suresi_ay"]
                 
-                # Her durumda temel metrikleri ekle
-                temel_metrikler = ["istihdam_orani", "girisimcilik_orani", "ortalama_calisma_suresi_ay"]
-                metrik_cols.extend(temel_metrikler)
-                
-                # Spesifik anahtar kelimelere göre ek metrikler
-                if any(word in question_lower for word in ["istihdam", "çalışma", "iş", "employment"]):
+                if any(word in question_lower for word in ["istihdam", "çalışma", "iş"]):
                     metrik_cols.extend([col for col in self.csv_data.columns if "istihdam" in col])
-                    logger.info("📊 İstihdam metrikleri eklendi")
                     
-                if any(word in question_lower for word in ["maaş", "gelir", "salary", "wage"]):
+                if any(word in question_lower for word in ["maaş", "gelir", "salary"]):
                     metrik_cols.extend([col for col in self.csv_data.columns if col.startswith("maas_")])
-                    logger.info("💰 Maaş metrikleri eklendi")
                     
-                if any(word in question_lower for word in ["sektör", "sector", "alan"]):
+                if any(word in question_lower for word in ["sektör", "sector"]):
                     metrik_cols.extend([col for col in self.csv_data.columns if col.startswith("sektor_")])
-                    logger.info("🏢 Sektör metrikleri eklendi")
                     
-                if any(word in question_lower for word in ["firma", "şirket", "company"]):
+                if any(word in question_lower for word in ["firma", "şirket"]):
                     metrik_cols.extend([col for col in self.csv_data.columns if col.startswith("firma_")])
-                    logger.info("🏭 Firma metrikleri eklendi")
-                    
-                if any(word in question_lower for word in ["girişim", "startup", "entrepreneur"]):
-                    metrik_cols.extend([col for col in self.csv_data.columns if "girisim" in col])
-                    logger.info("🚀 Girişimcilik metrikleri eklendi")
                 
-                # Duplicate'ları temizle ve maksimum 30 metrik
                 metrik_cols = list(dict.fromkeys(metrik_cols))[:30]
-                logger.info(f"📋 Final metrik sayısı: {len(metrik_cols)}")
                 
-                # Küçük veri seti hazırla
                 selected_cols = ['bolum_adi', 'gosterge_id'] + metrik_cols
                 csv_snippet = filtered[selected_cols].to_string(index=False)
                 
-                logger.info(f"📄 CSV snippet hazırlandı: {len(csv_snippet)} karakter")
-    
             else:
-                # Genel sorgu - top 5 bölüm göster
-                logger.info("📈 Genel CSV sorusu - top bölümler gösteriliyor")
-                
-                # İstihdam oranına göre top 5 bölüm
+                # Genel analiz
+                logger.info("📈 Genel CSV analizi")
                 top_bolumler = self.csv_data.nlargest(5, 'istihdam_orani')
                 sample_cols = ['bolum_adi', 'istihdam_orani', 'girisimcilik_orani', 'ortalama_calisma_suresi_ay']
                 csv_snippet = top_bolumler[sample_cols].to_string(index=False)
-                logger.info("📊 Top 5 bölüm analizi hazırlandı")
     
-            # CSV Agent'a sor - GELİŞTİRİLMİŞ ERROR HANDLING
+            # CSV Agent'a sor
             if self.llm_csv_agent:
                 try:
-                    logger.info(f"🤖 CSV Agent'a gönderiliyor: {len(csv_snippet)} karakter snippet")
-                    
                     result = await self.llm_csv_agent.ainvoke(
                         self.csv_agent_prompt.format(
                             question=question,
-                            csv_data=csv_snippet[:2000]  # 2000 karakter sınırı
+                            csv_data=csv_snippet[:2000]
                         )
                     )
                     analysis = result.content.strip()
                     
-                    logger.info(f"✅ CSV Agent analiz tamamlandı: {len(analysis)} karakter")
-                    logger.info(f"📄 Analiz önizleme: '{analysis[:150]}...'")
-                    
-                    # Boş veya çok kısa yanıt kontrolü
                     if len(analysis) < 20:
-                        logger.warning("⚠️ CSV Agent çok kısa yanıt verdi")
-                        analysis = f"CSV analizi tamamlandı. {bolum_adi or 'İlgili bölümler'} için temel veriler mevcut: {csv_snippet[:200]}..."
+                        analysis = f"CSV analizi tamamlandı. {bolum_adi or 'İlgili bölümler'} için temel veriler: {csv_snippet[:200]}..."
                         
                 except Exception as agent_error:
                     logger.error(f"❌ CSV Agent hatası: {agent_error}")
-                    analysis = f"CSV analizi sırasında model hatası oluştu. Ham veri bulundu: {csv_snippet[:300]}..."
+                    analysis = f"CSV verisi bulundu: {csv_snippet[:300]}..."
             else:
-                logger.warning("⚠️ CSV Agent LLM mevcut değil - ham veri döndürülüyor")
-                analysis = f"CSV analizi için model mevcut değil. İlgili veri bulundu: {csv_snippet[:300]}..."
+                analysis = f"CSV verisi: {csv_snippet[:300]}..."
     
             csv_time = time.time() - csv_start
-            logger.info(f"⏱️ Toplam CSV süresi: {csv_time:.2f}s")
-            logger.info(f"📊 Final analiz: {len(analysis)} karakter")
+            logger.info(f"⏱️ CSV analizi süresi: {csv_time:.2f}s")
             
             return analysis
     
         except Exception as e:
             csv_time = time.time() - csv_start
-            logger.error(f"❌ CSV analiz genel hatası ({csv_time:.2f}s): {e}")
-            return "CSV analizi sırasında hata oluştu"
+            logger.error(f"❌ CSV analiz hatası ({csv_time:.2f}s): {e}")
+            return "CSV analizi hatası"
             
     async def _generate_final_response_safe(self, question: str, context1: str, context2: str, history: str = "") -> str:
-        """Güvenli final yanıt oluşturma - Detaylı logging"""
+        """Final yanıt oluşturma"""
         try:
-            final_start = time.time()
-            
             if not self.llm_final:
                 logger.error("❌ Final LLM mevcut değil!")
-                return "Yanıt oluşturma servisi geçici olarak kullanılamıyor. Lütfen tekrar deneyin."
-            
-            logger.info(f"🎯 FINAL RESPONSE OLUŞTURULUYOR:")
-            logger.info(f"   📝 Soru: '{question[:60]}...'")
-            logger.info(f"   📄 Context1: {len(context1)} karakter")
-            logger.info(f"   📊 Context2: {len(context2)} karakter")
-            logger.info(f"   🧠 History: {len(history)} karakter")
+                return "Yanıt oluşturma servisi geçici olarak kullanılamıyor."
             
             result = await self.llm_final.ainvoke(
                 self.final_prompt.format(
@@ -894,122 +737,66 @@ class TercihAsistaniProcessor:
             )
             
             final_response = result.content.strip()
-            final_time = time.time() - final_start
-            
-            logger.info(f"✅ FINAL RESPONSE TAMAMLANDI ({final_time:.2f}s):")
-            logger.info(f"   📝 Yanıt uzunluğu: {len(final_response)} karakter")
-            logger.info(f"   📄 Yanıt önizleme: '{final_response[:100]}...'")
+            logger.info(f"✅ Final response oluşturuldu: {len(final_response)} karakter")
             
             return final_response
             
         except Exception as e:
             logger.error(f"❌ Final yanıt hatası: {e}")
-            return "Yanıt oluşturulurken hata oluştu. Lütfen tekrar deneyin."
+            return "Yanıt oluşturulurken hata oluştu."
 
     def _extract_sources(self, context1: str, context2: str) -> List[str]:
-        """Kaynaklarını çıkar - DÜZELTILMIŞ VERSİYON"""
+        """Kaynak çıkarma"""
         sources = []
         
-        logger.info(f"🔍 KAYNAK ÇIKARIMI:")
-        logger.info(f"   📄 Context1 (Vector): {len(context1)} karakter")
-        logger.info(f"   📊 Context2 (CSV): {len(context2)} karakter")
-        
-        # Context1 (Vector) kaynak kontrolü - İYİLEŞTİRİLMİŞ LOGIC
-        if context1 and len(context1.strip()) > 50:  # Minimum content check
-            # Hata mesajları kontrolü
-            error_keywords = [
-                "bulunamadı", "başarısız", "mevcut değil", "hata", 
-                "işlenemedi", "sorunu", "genel hatası"
-            ]
-            
+        # Vector context kontrolü
+        if context1 and len(context1.strip()) > 50:
+            error_keywords = ["bulunamadı", "başarısız", "mevcut değil", "hata"]
             has_error = any(keyword in context1.lower() for keyword in error_keywords)
             
             if not has_error:
-                # Başarılı vector content var
                 if "İZÜ" in context1 or "tercih rehberi" in context1.lower():
                     sources.append(MessageSettings.SOURCES["IZU_GUIDE"])
-                    logger.info(f"   📄 İZÜ Rehberi kaynağı eklendi")
-                
-                if "yök" in context1.lower() or "üniversite izleme" in context1.lower():
+                elif "yök" in context1.lower():
                     sources.append(MessageSettings.SOURCES["YOK_REPORT"])
-                    logger.info(f"   📄 YÖK Raporu kaynağı eklendi")
-                
-                # Genel vector content varsa en azından genel kaynak ekle
-                if not sources:
-                    sources.append(MessageSettings.SOURCES["IZU_GUIDE"])  # Default vector source
-                    logger.info(f"   📄 Vector content var - İZÜ Rehberi (default) eklendi")
-            else:
-                logger.info(f"   ❌ Vector content'te hata mesajı var: '{context1[:100]}...'")
-        else:
-            logger.info(f"   ❌ Vector content çok kısa veya boş")
+                else:
+                    sources.append(MessageSettings.SOURCES["IZU_GUIDE"])
         
-        # Context2 (CSV) kaynak kontrolü - İYİLEŞTİRİLMİŞ LOGIC
-        if context2 and len(context2.strip()) > 50:  # Minimum content check
-            # Hata mesajları kontrolü
-            csv_error_keywords = [
-                "mevcut değil", "hata", "başarısız", "gerekli değil", 
-                "model mevcut değil", "analizi sırasında hata"
-            ]
-            
+        # CSV context kontrolü
+        if context2 and len(context2.strip()) > 50:
+            csv_error_keywords = ["mevcut değil", "hata", "başarısız", "gerekli değil"]
             has_csv_error = any(keyword in context2.lower() for keyword in csv_error_keywords)
             
             if not has_csv_error:
-                # Başarılı CSV analizi var mı kontrol et
-                csv_success_indicators = [
-                    "analiz", "oran", "veri", "sonuç", "bölüm", 
-                    "istihdam", "maaş", "sektör", "%"
-                ]
-                
+                csv_success_indicators = ["analiz", "oran", "veri", "bölüm", "istihdam", "maaş", "%"]
                 has_csv_content = any(indicator in context2.lower() for indicator in csv_success_indicators)
                 
                 if has_csv_content:
                     sources.append(MessageSettings.SOURCES["UNIVERI_DB"])
-                    logger.info(f"   📊 CSV kaynağı eklendi: UNİ-VERİ DB")
-                else:
-                    logger.info(f"   ⚠️ CSV content var ama analiz içeriği belirsiz")
-            else:
-                logger.info(f"   ❌ CSV content'te hata mesajı: '{context2[:100]}...'")
-        else:
-            logger.info(f"   ❌ CSV content çok kısa veya boş")
         
-        # Kaynak yoksa genel kaynak ekle
         if not sources:
             sources.append(MessageSettings.SOURCES["GENERAL"])
-            logger.info(f"   📝 Hiç kaynak bulunamadı - Genel kaynak eklendi")
         
-        # Duplicate source'ları temizle
-        sources = list(dict.fromkeys(sources))
-        
-        logger.info(f"   ✅ Final kaynak sayısı: {len(sources)}")
-        for i, source in enumerate(sources, 1):
-            logger.info(f"      {i}. {source}")
-        
-        return sources
+        return list(dict.fromkeys(sources))
 
     async def test_all_connections(self) -> Dict[str, str]:
-        """Gelişmiş bağlantı testi - Detaylı logging"""
+        """Bağlantı testleri"""
         logger.info("🧪 TÜM BAĞLANTILAR TEST EDİLİYOR...")
         results = {}
         
         # OpenAI Client test
         try:
             if self.openai_client:
-                test_start = time.time()
                 test_embedding = self.get_embedding("test")
-                test_time = time.time() - test_start
-                results["OpenAI Client"] = f"✅ Bağlı ({len(test_embedding)} boyut, {test_time:.2f}s)"
-                logger.info(f"   ✅ OpenAI Client: OK")
+                results["OpenAI Client"] = f"✅ Bağlı ({len(test_embedding)} boyut)"
             else:
                 results["OpenAI Client"] = "❌ Client başlatılmadı"
-                logger.error(f"   ❌ OpenAI Client: Başlatılmadı")
         except Exception as e:
             results["OpenAI Client"] = f"❌ Hata: {str(e)[:50]}"
-            logger.error(f"   ❌ OpenAI Client: {e}")
         
         # LLM testleri
         llm_tests = [
-            ("Evaluation", self.llm_evaluation),
-            ("Correction", self.llm_correction), 
+            ("Smart Evaluator-Corrector", self.llm_smart_evaluator_corrector),
             ("Search Optimizer", self.llm_search_optimizer),
             ("CSV Agent", self.llm_csv_agent),
             ("Final Response", self.llm_final)
@@ -1018,102 +805,41 @@ class TercihAsistaniProcessor:
         for name, llm in llm_tests:
             try:
                 if llm:
-                    test_start = time.time()
                     await llm.ainvoke("Test")
-                    test_time = time.time() - test_start
-                    results[name] = f"✅ Bağlı ({test_time:.2f}s)"
-                    logger.info(f"   ✅ {name}: OK")
+                    results[name] = "✅ Bağlı"
                 else:
                     results[name] = "❌ Model yüklenmedi"
-                    logger.error(f"   ❌ {name}: Yüklenmedi")
             except Exception as e:
                 results[name] = f"❌ Hata: {str(e)[:50]}"
-                logger.error(f"   ❌ {name}: {e}")
         
-        # Native AstraDB test
+        # AstraDB test
         try:
             if self.astra_collection:
-                test_start = time.time()
                 test_results = list(self.astra_collection.find({}, limit=1))
-                test_time = time.time() - test_start
-                results["AstraDB Native"] = f"✅ Bağlı ({len(test_results)} doküman, {test_time:.2f}s)"
-                logger.info(f"   ✅ AstraDB Native: OK")
+                results["AstraDB Native"] = f"✅ Bağlı ({len(test_results)} doküman)"
             else:
                 results["AstraDB Native"] = "❌ Collection başlatılmadı"
-                logger.error(f"   ❌ AstraDB Native: Başlatılmadı")
         except Exception as e:
             results["AstraDB Native"] = f"❌ Hata: {str(e)[:50]}"
-            logger.error(f"   ❌ AstraDB Native: {e}")
         
         # CSV test
         try:
             if self.csv_data is not None:
-                unique_bolumlr = len(self.csv_data['bolum_adi'].unique())
-                results["CSV"] = f"✅ Yüklü ({len(self.csv_data)} satır, {unique_bolumlr} bölüm)"
-                logger.info(f"   ✅ CSV: OK")
+                results["CSV"] = f"✅ Yüklü ({len(self.csv_data)} satır)"
             else:
                 results["CSV"] = "❌ Yüklenmedi"
-                logger.error(f"   ❌ CSV: Yüklenmedi")
         except Exception as e:
             results["CSV"] = f"❌ Hata: {str(e)[:50]}"
-            logger.error(f"   ❌ CSV: {e}")
         
         # Memory test
         try:
-            test_start = time.time()
             self.memory.add_message("test_connection", "user", "test")
             history = self.memory.get_history("test_connection")
-            test_time = time.time() - test_start
-            
             if history:
-                results["Memory"] = f"✅ Redis bağlı ({test_time:.3f}s)"
-                logger.info(f"   ✅ Memory: OK")
+                results["Memory"] = "✅ Redis bağlı"
             else:
-                results["Memory"] = f"⚠️ Memory çalışıyor ama boş ({test_time:.3f}s)"
-                logger.warning(f"   ⚠️ Memory: Çalışıyor ama boş")
+                results["Memory"] = "⚠️ Memory çalışıyor ama boş"
         except Exception as e:
             results["Memory"] = f"❌ Hata: {str(e)[:50]}"
-            logger.error(f"   ❌ Memory: {e}")
-        
-        # Test özeti
-        success_count = sum(1 for v in results.values() if v.startswith("✅"))
-        total_count = len(results)
-        logger.info(f"🧪 TEST RAPORU: {success_count}/{total_count} başarılı")
         
         return results
-
-    async def debug_csv_data(self) -> Dict[str, Any]:
-        """CSV debug bilgileri - Detaylı analiz"""
-        try:
-            if self.csv_data is None:
-                return {"status": "error", "message": "CSV verisi yüklenmedi"}
-            
-            logger.info("🧪 CSV DEBUG BİLGİLERİ TOPLANILIYOR...")
-            
-            debug_info = {
-                "basic_info": {
-                    "total_rows": len(self.csv_data),
-                    "total_columns": len(self.csv_data.columns),
-                    "unique_bolumlr": len(self.csv_data['bolum_adi'].unique()),
-                    "unique_years": len(self.csv_data['gosterge_id'].unique()) if 'gosterge_id' in self.csv_data.columns else 0
-                },
-                "sample_bolumlr": self.csv_data['bolum_adi'].unique()[:10].tolist(),
-                "column_categories": {
-                    "istihdam": [col for col in self.csv_data.columns if "istihdam" in col],
-                    "maas": [col for col in self.csv_data.columns if col.startswith("maas_")],
-                    "firma": [col for col in self.csv_data.columns if col.startswith("firma_")],
-                    "sektor": [col for col in self.csv_data.columns if col.startswith("sektor_")]
-                },
-                "sample_data": self.csv_data.head(3).to_dict(),
-                "missing_data": self.csv_data.isnull().sum().to_dict()
-            }
-            
-            logger.info(f"   📊 Toplam satır: {debug_info['basic_info']['total_rows']}")
-            logger.info(f"   📋 Toplam kolon: {debug_info['basic_info']['total_columns']}")
-            logger.info(f"   🎓 Toplam bölüm: {debug_info['basic_info']['unique_bolumlr']}")
-            
-            return {"status": "success", "debug_info": debug_info}
-            
-        except Exception as e:
-            logger.error(f"❌ CSV debug hatası: {e}")
-            return {"status": "error", "message": str(e)}
