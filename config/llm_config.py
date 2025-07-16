@@ -69,12 +69,14 @@ class LLMConfigs:
     
     # YENİ: Birleştirilmiş Smart Evaluator-Corrector
     SMART_EVALUATOR_CORRECTOR = LLMConfig(
-        provider=LLMProvider.GOOGLE, 
-        model="gemini-1.5-flash",  
+        provider=LLMProvider.OPENAI, 
+        model="gpt-4o-mini",  
         temperature=0.2,  # Düşük temperature - consistent output için
         max_tokens=200,   # Artırıldı - context analysis için
-        fallback_provider=LLMProvider.OPENAI,
-        fallback_model="gpt-4o-mini"
+        timeout=45,
+        max_retries=2
+        fallback_provider=LLMProvider.GOOGLE,
+        fallback_model="gemini-1.5-pro"
     )
     
     # KALAN MODELLER - değişmedi
@@ -93,7 +95,7 @@ class LLMConfigs:
         temperature=0.3, 
         max_tokens=500, 
         timeout=120,
-        max_retries=3
+        max_retries=2
     )
 
 class LLMFactory:
