@@ -69,8 +69,8 @@ class LLMConfigs:
     
     # YENİ: Birleştirilmiş Smart Evaluator-Corrector
     SMART_EVALUATOR_CORRECTOR = LLMConfig(
-        provider=LLMProvider.ANTHROPIC, 
-        model="claude-3-5-sonnet-20241022",  # Daha güçlü model - complex task için
+        provider=LLMProvider.GOOGLE, 
+        model="gemini-1.5-flash",  
         temperature=0.2,  # Düşük temperature - consistent output için
         max_tokens=200,   # Artırıldı - context analysis için
         fallback_provider=LLMProvider.OPENAI,
@@ -78,15 +78,6 @@ class LLMConfigs:
     )
     
     # KALAN MODELLER - değişmedi
-    SEARCH_OPTIMIZER = LLMConfig(
-        provider=LLMProvider.OPENAI, 
-        model="gpt-4o-mini", 
-        temperature=0.3, 
-        max_tokens=150, 
-        timeout=60,
-        max_retries=3
-    )
-    
     CSV_AGENT = LLMConfig(
         provider=LLMProvider.ANTHROPIC, 
         model="claude-3-5-sonnet-20241022", 
@@ -196,7 +187,9 @@ class FallbackConfig:
         "gemini-1.5-flash": "gpt-4o-mini",
         "gemini-1.5-pro": "gpt-4o-mini",
         "claude-3-5-sonnet-20241022": "gpt-4o",
-        "claude-3-haiku-20240307": "gpt-4o-mini"
+        "claude-3-haiku-20240307": "gpt-4o-mini",
+        "gpt-4o-mini":"gemini-1.5-pro",
+        "gpt-4o":"claude-3-5-sonnet-20241022"
     }
     MAX_FALLBACK_ATTEMPTS = 2
     FALLBACK_DELAY = 1.0
