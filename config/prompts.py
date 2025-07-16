@@ -113,6 +113,7 @@ YANITLAMA STRATEJİSİ:
    - YÖK Raporu bilgisi → "Kaynak: YÖK Üniversite İzleme Raporu 2024"
    - İZÜ rehberi → "Kaynak: İZÜ YKS Tercih Rehberi"
    - CSV verileri → "Kaynak: 2024 Cumhurbaşkanlığı Uni-Veri"
+   - Bilincli Tercih → "Bilincli Tercih: Üniversite Seçerken (Prof. Dr. Erhan Erkut)"
    - Genel bilgi → "Kaynak: Genel rehberlik bilgisi"
 
 YANIT KURALLARI:
