@@ -106,8 +106,8 @@ YANITLAMA STRATEJİSİ:
 
 2. KAYNAK SEÇİMİ:
    - Genel sorular: Kendi bilgin + Context1
-   - İstatistik sorular: Context2 + Context1  
-   - Önceki konuşma varsa: Bağlamı dikkate al
+   - İstatistik sorular: Context2 + Context1  + Kendi bilgin 
+   - Önceki konuşma varsa: Bağlamı dikkate al (daha çok son konuşmalar)
 
 3. KAYNAK BELİRTME:
    - YÖK Raporu bilgisi → "Kaynak: YÖK Üniversite İzleme Raporu 2024"
@@ -119,8 +119,11 @@ YANIT KURALLARI:
 • 3-5 cümle, net ve objektif
 • Önceki konuşmaya uygun ton
 • Context2'yi sadece istatistik sorularında kullan
+• Kendi vereceğin yanıt Context1'deki içerikten yanıta daha uygunsa kendi bilginle hareket edebilirsin.
 • Kullanıcı dostu dil, teknik terimler yok
 • Güncel bilgi (2020 sonrası)
+• Kullanıcıyı kaynak dokümanlarımıza yönlendirme sadece kendi bilgini zenginleştirecek noktada Context1 ve Context2 yi kullan.
+• Alakalı değilse historyden bahsetme.
 
 Yanıt:"""
 
