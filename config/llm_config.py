@@ -81,21 +81,25 @@ class LLMConfigs:
     
     # KALAN MODELLER - değişmedi
     CSV_AGENT = LLMConfig(
-        provider=LLMProvider.ANTHROPIC, 
-        model="claude-3-5-sonnet-20241022", 
+        provider=LLMProvider.OPENAI, 
+        model="gpt-4o-mini", 
         temperature=0.3, 
-        max_tokens=600, 
-        fallback_provider=LLMProvider.OPENAI,
-        fallback_model="gpt-4o"
+        max_tokens=600,  
+        timeout=60,
+        max_retries=2, 
+        fallback_provider=LLMProvider.ANTHROPIC,
+        fallback_model="claude-3-5-sonnet-20241022"
     )
     
     FINAL_RESPONSE = LLMConfig(
         provider=LLMProvider.OPENAI, 
         model="gpt-4o", 
         temperature=0.3, 
-        max_tokens=500, 
-        timeout=120,
-        max_retries=2
+        max_tokens=400, 
+        timeout=60,
+        max_retries=2, 
+        fallback_provider=LLMProvider.ANTHROPIC,
+        fallback_model="claude-3-5-sonnet-20241022"
     )
 
 class LLMFactory:
