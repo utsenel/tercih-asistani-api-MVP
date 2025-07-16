@@ -7,7 +7,8 @@ class PromptTemplates:
     
        # YENİ: Birleştirilmiş Smart Evaluator-Corrector
     SMART_EVALUATOR_CORRECTOR = """
-GÖREV: Gelen soruyu önceki konuşma bağlamıyla değerlendirip optimize et.
+GÖREV: Gelen soruyu eğer gerekliyse önceki konuşma bağlamıyla değerlendirip optimize et.
+DİKKAT: Her soru geçmiş konuşmaya ihtiyaç duymayabilir.
 
 GEÇMIŞ KONUŞMA:
 {history}
@@ -15,9 +16,11 @@ GEÇMIŞ KONUŞMA:
 GÜNCEL SORU: {question}
 
 ADIM 1 - BAĞLAM ANALİZİ:
+• Sorunun önceki konuşma ile zenginleşmesi gerekiyor mu ona karar ver.
 • Önceki konuşmada spesifik bir bölüm/konu/meslek var mı?
 • Güncel soru önceki konuşmayla ilişkili mi? ("peki", "o zaman", "bunun" gibi bağlayıcılar)
 • Eksik referans var mı? ("onun maaşı", "bu bölümde", "orada" gibi)
+
 
 ADIM 2 - UYGUNLUK DEĞERLENDİRMESİ:
 KAPSAM DAHİLİ:
