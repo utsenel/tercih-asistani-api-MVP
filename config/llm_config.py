@@ -74,7 +74,7 @@ class LLMConfigs:
         temperature=0.2,  # Düşük temperature - consistent output için
         max_tokens=200,   # Artırıldı - context analysis için
         timeout=45,
-        max_retries=2
+        max_retries=2,
         fallback_provider=LLMProvider.GOOGLE,
         fallback_model="gemini-1.5-pro"
     )
