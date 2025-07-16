@@ -1,162 +1,195 @@
-"""
-İyileştirilmiş Prompt Templates - Performans ve Doğruluk Odaklı
-"""
+import os
+from dataclasses import dataclass
+from typing import Dict, Any, Optional
+from enum import Enum
+import logging
 
-class PromptTemplates:
-    """Optimize edilmiş prompt şablonları"""
+logger = logging.getLogger(__name__)
+
+class LLMProvider(Enum):
+    OPENAI = "openai"
+    GOOGLE = "google"
+    ANTHROPIC = "anthropic"
+
+@dataclass
+class LLMConfig:
+    provider: LLMProvider
+    model: str
+    temperature: float
+    max_tokens: int = 500
+    max_retries: int = 3
+    timeout: int = 100
+    fallback_provider: Optional[LLMProvider] = None
+    fallback_model: Optional[str] = None
     
-       # YENİ: Birleştirilmiş Smart Evaluator-Corrector
-    SMART_EVALUATOR_CORRECTOR = """
-GÖREV: Gelen soruyu önceki konuşma bağlamıyla değerlendirip optimize et.
-
-GEÇMIŞ KONUŞMA:
-{history}
-
-GÜNCEL SORU: {question}
-
-ADIM 1 - BAĞLAM ANALİZİ:
-• Önceki konuşmada spesifik bir bölüm/konu/meslek var mı?
-• Güncel soru önceki konuşmayla ilişkili mi? ("peki", "o zaman", "bunun" gibi bağlayıcılar)
-• Eksik referans var mı? ("onun maaşı", "bu bölümde", "orada" gibi)
-
-ADIM 2 - UYGUNLUK DEĞERLENDİRMESİ:
-KAPSAM DAHİLİ:
-• Üniversite/bölüm tercihi, sıralama, karşılaştırma
-• YKS/TYT/AYT sınavları, puan türleri
-• Kariyer/meslek bilgisi, gelecek planları
-• İstihdam/maaş verileri, iş imkanları
-• Eğitim süreci/kampüs yaşamı
-• Burs/öğrenci imkanları
-
-KAPSAM DIŞI:
-• Genel sohbet, gündelik konular
-• Teknik sorunlar, sistem hataları
-• Kişisel/aile meseleleri
-• Siyasi görüşler, ideolojik konular
-
-SELAMLAMA İNDİKATÖRLERİ:
-• "merhaba", "selam", "iyi günler", "nasılsın"
-• "yardım", "neler yapabilirsin", "kimsin"
-
-ADIM 3 - SORU OPTİMİZASYONU:
-• Bağlamsal bilgiyi soruya entegre et (bölüm adı, meslek, önceki konu)
-• Yazım hatalarını düzelt, kısaltmaları aç
-• Belirsizlikleri gider, eksik referansları tamamla
-• Tercih rehberliği terminolojisini kullan
-
-ÇIKTI FORMATI (kesinlikle bu formatta):
-STATUS: [UYGUN/SELAMLAMA/KAPSAM_DIŞI]
-ENHANCED_QUESTION: [Context-aware düzeltilmiş soru]
-
-ÖRNEK:
-Geçmiş: "user: bilgisayar mühendisliği nasıl bir bölüm?"
-Güncel: "peki maaşları nasıl?"
-STATUS: UYGUN
-ENHANCED_QUESTION: Bilgisayar mühendisliği mezunlarının maaş durumu ve gelir seviyeleri nasıl?
-"""
-
-    # Vector Arama - Daha etkili anahtar kelime genişletme
-    SEARCH_OPTIMIZER = """
-GÖREV: Soruyu vector arama için optimize et.
-
-STRATEJİ:
-• Ana konuya sinonimler ekle
-• İlgili alt konuları dahil et  
-• Eğitim terimleri kullan (lisans, önlisans, mezuniyet)
-• Kariyer terimleri ekle (iş imkanı, maaş, gelecek)
-
-ÇIKTI: Sadece optimize edilmiş arama metni
-
-Soru: {question}
-Optimize:"""
-
-    # CSV Agent - Çok daha seçici ve akıllı
-    CSV_AGENT = """
-SORU ANALİZİ: Önce sorunun CSV analizi gerektirip gerektirmediğini belirle.
-
-CSV ANALİZİ GEREKTİREN KONULAR:
-• İstihdam oranları (genel, akademik, yönetici)
-• Maaş dağılımları (17K altı, 17-25K, 25-34K, 34-51K, 51K+)
-• Sektörel dağılım
-• Firma ölçekleri (mikro, küçük, orta, büyük)
-• İşe başlama süreleri
-• Girişimcilik oranları
-
-KARAR VER:
-1. Soru yukarıdaki konulardan birini içeriyor mu?
-2. Spesifik bölüm/veri sorgusu mu yoksa genel bir soru mu?
-
-EĞER CSV ANALİZİ GEREKMİYORSA:
-"CSV analizi gerekli değil - genel rehberlik sorusu"
-
-EĞER CSV ANALİZİ GEREKİYORSA:
-Veri analizi yap ve 3-4 cümlelik özet ver. "Kaynak: 2024 Cumhurbaşkanlığı Uni-Veri" ekle.
-
-CSV Verisi: {csv_data}
-Soru: {question}
-
-Analiz:"""
-
-    # Final Response - Daha akıllı context kullanımı
-    FINAL_RESPONSE = """
-BAĞLAM:
-• Önceki Konuşma: {history}
-• Doküman Bilgisi: {context1}  
-• İstatistik Analizi: {context2}
-
-SORU: {question}
-
-YANITLAMA STRATEJİSİ:
-
-1. SORU TİPİNİ BELİRLE:
-   - Genel rehberlik sorusu mu?
-   - Spesifik veri/istatistik sorusu mu?
-   - Önceki konuşmayla ilişkili mi?
-
-2. KAYNAK SEÇİMİ:
-   - Genel sorular: Kendi bilgin + Context1
-   - İstatistik sorular: Context2 + Context1  + Kendi bilgin 
-   - Önceki konuşma varsa: Bağlamı dikkate al (daha çok son konuşmalar)
-
-3. KAYNAK BELİRTME:
-   - YÖK Raporu bilgisi → "Kaynak: YÖK Üniversite İzleme Raporu 2024"
-   - İZÜ rehberi → "Kaynak: İZÜ YKS Tercih Rehberi"
-   - CSV verileri → "Kaynak: 2024 Cumhurbaşkanlığı Uni-Veri"
-   - Bilincli Tercih → "Bilincli Tercih: Üniversite Seçerken (Prof. Dr. Erhan Erkut)"
-   - Genel bilgi → "Kaynak: Genel rehberlik bilgisi"
-
-YANIT KURALLARI:
-• 3-5 cümle, net ve objektif
-• Önceki konuşmaya uygun ton
-• Context2'yi sadece istatistik sorularında kullan
-• Kendi vereceğin yanıt Context1'deki içerikten yanıta daha uygunsa kendi bilginle hareket edebilirsin.
-• Kullanıcı dostu dil, teknik terimler yok
-• Güncel bilgi (2020 sonrası)
-• Kullanıcıyı kaynak dokümanlarımıza yönlendirme sadece kendi bilgini zenginleştirecek noktada Context1 ve Context2 yi kullan.
-• Alakalı değilse historyden bahsetme.
-
-Yanıt:"""
-
-# CSV Tetikleyici Kelimeler - Daha spesifik
-CSV_KEYWORDS = [
-    # Temel İstatistik Sorular
-    "istihdam oranı", "çalışma oranı", "iş bulma", "mezun istihdamı",
-    "maaş", "gelir", "kazanç", "ücret", "para kazanma",
-    "sektör", "hangi sektör", "çalışma alanı", "iş sahası",
-    "firma", "şirket", "işyeri", "çalıştığı yer",
-    "işe başlama", "mezun olduktan sonra", "iş bulma süresi",
-    "girişimcilik", "kendi işi", "startup", "girişim",
+    def to_langchain_params(self) -> Dict[str, Any]:
+        if self.provider == LLMProvider.OPENAI:
+            return {
+                "api_key": os.getenv("OPENAI_API_KEY"),
+                "model": self.model,
+                "temperature": self.temperature,
+                "max_tokens": self.max_tokens,
+                "max_retries": self.max_retries,
+                "timeout": self.timeout
+            }
+        elif self.provider == LLMProvider.GOOGLE:
+            return {
+                "google_api_key": os.getenv("GOOGLE_API_KEY"),
+                "model": self.model,
+                "temperature": self.temperature,
+                "max_output_tokens": self.max_tokens,
+                "max_retries": self.max_retries,
+                "timeout": self.timeout
+            }
+        elif self.provider == LLMProvider.ANTHROPIC:
+            return {
+                "anthropic_api_key": os.getenv("ANTHROPIC_API_KEY"),
+                "model": self.model,
+                "temperature": self.temperature,
+                "max_tokens": self.max_tokens,
+            }
     
-    # Spesifik Metrik Sorular  
-    "yüzde kaç", "oranı nedir", "ne kadar", "hangi oranda",
-    "istatistik", "veri", "sayısal", "rakam",
-    "karşılaştır", "hangi bölüm daha", "en yüksek", "en düşük",
+    def get_fallback_config(self):
+        """Fallback config döndür"""
+        if self.fallback_provider and self.fallback_model:
+            return LLMConfig(
+                provider=self.fallback_provider,
+                model=self.fallback_model,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                max_retries=self.max_retries,
+                timeout=self.timeout
+            )
+        return None
+
+class LLMConfigs:
+    """
+    Güncellenmiş LLM konfigürasyonları - Smart Evaluator-Corrector ile
+    """
     
-    # Maaş Aralıkları
-    "17000", "25000", "34000", "51000", "maaş aralığı",
-    "düşük maaş", "yüksek maaş", "ortalama maaş",
+    # YENİ: Birleştirilmiş Smart Evaluator-Corrector
+    SMART_EVALUATOR_CORRECTOR = LLMConfig(
+        provider=LLMProvider.GOOGLE, 
+        model="gemini-1.5-flash",  #
+        temperature=0.2,  # Düşük temperature - consistent output için
+        max_tokens=200,   # Artırıldı - context analysis için
+        fallback_provider=LLMProvider.OPENAI,
+        fallback_model="gpt-4o-mini"
+    )
     
-    # Zamanlama
-    "kaç ayda", "ne kadar sürede", "hemen", "mezun olmadan",
-    "6 ay", "12 ay", "1 yıl", "2 yıl"
-]
+    # KALAN MODELLER - değişmedi
+    CSV_AGENT = LLMConfig(
+        provider=LLMProvider.ANTHROPIC, 
+        model="claude-3-5-sonnet-20241022", 
+        temperature=0.3, 
+        max_tokens=600, 
+        fallback_provider=LLMProvider.OPENAI,
+        fallback_model="gpt-4o"
+    )
+    
+    FINAL_RESPONSE = LLMConfig(
+        provider=LLMProvider.OPENAI, 
+        model="gpt-4o", 
+        temperature=0.3, 
+        max_tokens=500, 
+        timeout=120,
+        max_retries=3
+    )
+
+class LLMFactory:
+    """Gelişmiş LLM Factory - Fallback desteği"""
+    
+    @staticmethod
+    def create_llm(config: LLMConfig, use_fallback: bool = False):
+        """
+        LLM oluştur, hata durumunda fallback kullan
+        """
+        target_config = config
+        
+        if use_fallback and config.get_fallback_config():
+            target_config = config.get_fallback_config()
+            logger.info(f"🔄 Fallback kullanılıyor: {target_config.provider.value} - {target_config.model}")
+        
+        try:
+            params = target_config.to_langchain_params()
+            
+            if target_config.provider == LLMProvider.OPENAI:
+                api_key = params.get("api_key")
+                from langchain_openai import ChatOpenAI
+                if not api_key:
+                    raise ValueError("OPENAI_API_KEY bulunamadı")
+                return ChatOpenAI(**params)
+                
+            elif target_config.provider == LLMProvider.GOOGLE:
+                api_key = params.get("google_api_key")
+                from langchain_google_genai import ChatGoogleGenerativeAI
+                if not api_key:
+                    raise ValueError("GOOGLE_API_KEY bulunamadı")
+                return ChatGoogleGenerativeAI(**params)
+                
+            elif target_config.provider == LLMProvider.ANTHROPIC:
+                api_key = params.get("anthropic_api_key")
+                from langchain_anthropic import ChatAnthropic
+                if not api_key:
+                    raise ValueError("ANTHROPIC_API_KEY bulunamadı")
+                return ChatAnthropic(**params)
+            
+            else:
+                raise ValueError(f"Desteklenmeyen provider: {target_config.provider}")
+                
+        except Exception as e:
+            logger.error(f"❌ LLM oluşturma hatası ({target_config.provider.value}): {e}")
+            raise
+
+    @staticmethod
+    def create_llm_with_fallback(config: LLMConfig):
+        """
+        Primary'yi dene, başarısız olursa fallback'i kullan
+        """
+        try:
+            return LLMFactory.create_llm(config, use_fallback=False)
+        except Exception as primary_error:
+            logger.warning(f"⚠️ Primary LLM hatası: {primary_error}")
+            
+            if config.get_fallback_config():
+                try:
+                    logger.info(f"🔄 Fallback deneniyor...")
+                    return LLMFactory.create_llm(config, use_fallback=True)
+                except Exception as fallback_error:
+                    logger.error(f"❌ Fallback de başarısız: {fallback_error}")
+                    raise fallback_error
+            else:
+                raise primary_error
+
+# Diğer config'ler aynı
+class VectorConfig:
+    SIMILARITY_TOP_K = 3
+    SEARCH_TYPE = "similarity"
+    SCORE_THRESHOLD = 0.7
+
+class CSVConfig:
+    SAMPLE_ROWS = 68
+    MAX_ROWS_FOR_FULL_ANALYSIS = 100
+
+class PerformanceConfig:
+    ENABLE_METRICS = True
+    LOG_RESPONSE_TIMES = True
+    LOG_TOKEN_USAGE = True
+    LOG_PROVIDER_DISTRIBUTION = True
+    WARNING_THRESHOLD = 5.0
+    ERROR_THRESHOLD = 15.0
+    TRACK_DAILY_USAGE = True
+    DAILY_TOKEN_LIMIT = 1000000
+
+class FallbackConfig:
+    ENABLE_FALLBACK = True
+    FALLBACK_MAPPINGS = {
+        "gemini-1.5-flash": "gpt-4o-mini",
+        "gemini-1.5-pro": "gpt-4o-mini",
+        "claude-3-5-sonnet-20241022": "gpt-4o",
+        "claude-3-haiku-20240307": "gpt-4o-mini",
+        "gpt-4o-mini": "gemini-1.5-pro",
+        "gpt-4o-mini": "claude-3-5-sonnet-20241022",
+    }
+    MAX_FALLBACK_ATTEMPTS = 2
+    FALLBACK_DELAY = 1.0
