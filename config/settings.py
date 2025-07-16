@@ -1,5 +1,5 @@
 """
-Genel uygulama ayarları
+Genel uygulama ayarları - Log iyileştirmesi ile
 """
 import os
 from typing import List
@@ -20,9 +20,21 @@ class AppSettings:
     CORS_METHODS = ["*"]
     CORS_HEADERS = ["*"]
     
-    # Logging Ayarları
-    LOG_LEVEL = "INFO"
+    # YENİ: Gelişmiş Logging Ayarları
+    DEBUG_MODE = os.getenv("DEBUG_MODE", "false").lower() == "true"
+    LOG_LEVEL = "DEBUG" if DEBUG_MODE else "INFO"
     LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    
+    # Performance Logging
+    PERFORMANCE_LOGGING = os.getenv("PERFORMANCE_LOGGING", "true").lower() == "true"
+    DETAILED_TIMING = DEBUG_MODE  # Sadece debug mode'da detaylı timing
+    
+    # Component Logging Kontrolü  
+    LOG_SESSION_DETAILS = DEBUG_MODE
+    LOG_MEMORY_OPERATIONS = DEBUG_MODE
+    LOG_VECTOR_DETAILS = DEBUG_MODE
+    LOG_CSV_DETAILS = DEBUG_MODE
+    LOG_LLM_RESPONSES = DEBUG_MODE
 
 class DatabaseSettings:
     """Veritabanı ayarları"""
