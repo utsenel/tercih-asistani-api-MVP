@@ -57,8 +57,7 @@ class TercihAsistaniProcessor:
         # YENİ: Smart Evaluator-Corrector
         self.llm_smart_evaluator_corrector = None
         
-        # KALAN LLM'LER - eski evaluation ve correction kaldırıldı
-        self.llm_search_optimizer = None
+        # KALAN LLM'LER - search optimizer kaldırıldı
         self.llm_csv_agent = None
         self.llm_final = None
         
@@ -75,8 +74,7 @@ class TercihAsistaniProcessor:
             PromptTemplates.SMART_EVALUATOR_CORRECTOR
         )
         
-        # KALAN PROMPT'LAR - değişmedi
-        self.search_optimizer_prompt = ChatPromptTemplate.from_template(PromptTemplates.SEARCH_OPTIMIZER)
+        # KALAN PROMPT'LAR - search optimizer kaldırıldı
         self.csv_agent_prompt = ChatPromptTemplate.from_template(PromptTemplates.CSV_AGENT)
         self.final_prompt = ChatPromptTemplate.from_template(PromptTemplates.FINAL_RESPONSE)
 
@@ -174,10 +172,9 @@ class TercihAsistaniProcessor:
             raise
 
     async def _initialize_llms_new(self):
-        """YENİ LLM başlatma - Smart Evaluator ile"""
+        """YENİ LLM başlatma - Search Optimizer kaldırıldı"""
         llm_configs = {
             "smart_evaluator_corrector": LLMConfigs.SMART_EVALUATOR_CORRECTOR,
-            "search_optimizer": LLMConfigs.SEARCH_OPTIMIZER,
             "csv_agent": LLMConfigs.CSV_AGENT,
             "final": LLMConfigs.FINAL_RESPONSE
         }
@@ -472,7 +469,7 @@ class TercihAsistaniProcessor:
             }
 
     async def _get_vector_context_native(self, question: str) -> str:
-        """Native AstraDB ile vector arama"""
+        """Native AstraDB ile vector arama - Search optimizer kaldırıldı"""
         try:
             vector_start = time.time()
             
@@ -482,17 +479,9 @@ class TercihAsistaniProcessor:
             
             logger.info(f"🔍 Native vector arama başlatılıyor: {question[:50]}...")
             
-            # Search query optimize et
+            # Enhanced question direkt kullan (extra optimization yok)
             search_text = question
-            if self.llm_search_optimizer:
-                try:
-                    optimized_query = await self.llm_search_optimizer.ainvoke(
-                        self.search_optimizer_prompt.format(question=question)
-                    )
-                    search_text = optimized_query.content.strip()
-                    logger.info(f"✨ Optimize edilmiş sorgu: {search_text[:80]}...")
-                except Exception as e:
-                    logger.warning(f"⚠️ Sorgu optimizasyonu başarısız: {e}")
+            logger.info(f"✨ Search text (enhanced): {search_text[:80]}...")
             
             # Embedding oluştur
             try:
@@ -797,7 +786,6 @@ class TercihAsistaniProcessor:
         # LLM testleri
         llm_tests = [
             ("Smart Evaluator-Corrector", self.llm_smart_evaluator_corrector),
-            ("Search Optimizer", self.llm_search_optimizer),
             ("CSV Agent", self.llm_csv_agent),
             ("Final Response", self.llm_final)
         ]
