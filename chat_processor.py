@@ -327,6 +327,8 @@ class TercihAsistaniProcessor:
                         # Guidance category'yi manual tespit et
                         guidance_category = GuidanceTemplates.detect_category(message)
                         return {"status": "REHBERLİK_GEREKTİREN", "guidance_category": guidance_category, "enhanced_question": message}
+                    elif "META_BOT" in response.upper():
+                        return {"status": "META_BOT", "guidance_category": "META_BOT", "enhanced_question": message}
                     elif "UYGUN" in response.upper():
                         return {"status": "UYGUN", "guidance_category": "", "enhanced_question": message}
                     elif "SELAMLAMA" in response.upper():
@@ -378,6 +380,26 @@ class TercihAsistaniProcessor:
                 return {
                     "response": "Merhaba! Ben bir üniversite tercih asistanıyım. Size YKS tercihleri, bölüm seçimi, kariyer planlaması konularında yardımcı olabilirim. Hangi konuda bilgi almak istiyorsunuz?",
                     "metadata": {"processing_time": round(total_time, 2)}
+                }
+            
+            # YENİ: Meta bot soruları
+            if status == "META_BOT":
+                total_time = time.time() - start_time
+                logger.info(f"Meta bot request completed in {total_time:.2f}s")
+                
+                # META_BOT template'ini al
+                meta_template = GuidanceTemplates.get_template("META_BOT")
+                
+                # Memory'ye kaydet
+                self.memory.add_message(session_id, "user", message)
+                self.memory.add_message(session_id, "assistant", meta_template)
+                
+                return {
+                    "response": meta_template,
+                    "metadata": {
+                        "processing_time": round(total_time, 2),
+                        "mode": "meta_bot"
+                    }
                 }
             
             # YENİ: Rehberlik modu kontrolü
