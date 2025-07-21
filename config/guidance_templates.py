@@ -156,7 +156,10 @@ Sen de bana hangi konuda yardıma ihtiyaç duyduğunu söyleyebilirsin! 😊"""
             "sen kimsin", "nasıl çalışıyorsun", "neler yapabilirsin",
             "insanla mı konuşuyorum", "robot musun", "yapay zeka mısın",
             "bana nasıl yardımcı olacaksın", "ne tür sorular sorabilirim",
-            "kim olduğunu", "ne yapabildiğini", "hangi konularda yardımcı"
+            "kim olduğunu", "ne yapabildiğini", "hangi konularda yardımcı",
+            "çalışma mekanizman", "mekanizman", "nasıl yardım",
+            "nasıl çalış", "çalışma şekl", "yardım edecek", "yardımcı ol",
+            "kimle konuş", "insan mı", "bot mu", "asistan mı"
         ]
     }
     
