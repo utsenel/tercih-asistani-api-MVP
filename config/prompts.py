@@ -1,5 +1,5 @@
 """
-İyileştirilmiş Prompt Templates - Performans ve Doğruluk Odaklı
+İyileştirilmiş Prompt Templates - Basitleştirilmiş Kaynak Sistemi
 """
 
 class PromptTemplates:
@@ -73,7 +73,7 @@ STRATEJİ:
 Soru: {question}
 Optimize:"""
 
-    # CSV Agent - Çok daha seçici ve akıllı
+    # CSV Agent - Değişiklik yok, zaten doğru format
     CSV_AGENT = """
 SORU ANALİZİ: Önce sorunun CSV analizi gerektirip gerektirmediğini belirle.
 
@@ -93,14 +93,14 @@ EĞER CSV ANALİZİ GEREKMİYORSA:
 "CSV analizi gerekli değil - genel rehberlik sorusu"
 
 EĞER CSV ANALİZİ GEREKİYORSA:
-Veri analizi yap ve 3-4 cümlelik özet ver. "Kaynak: 2024 Cumhurbaşkanlığı Uni-Veri" ekle.
+Veri analizi yap ve 3-4 cümlelik özet ver. Rakam/oran verirken "2024 Cumhurbaşkanlığı Uni-Veri Veritabanında yer alan bilgiye göre" ifadesini kullan.
 
 CSV Verisi: {csv_data}
 Soru: {question}
 
 Analiz:"""
 
-    # Final Response - Daha akıllı context kullanımı
+    # Final Response - Basitleştirilmiş kaynak sistemi
     FINAL_RESPONSE = """
 BAĞLAM:
 • Önceki Konuşma: {history}
@@ -117,17 +117,15 @@ YANITLAMA STRATEJİSİ:
    - Önceki konuşmayla ilişkili mi?
 
 2. KAYNAK SEÇİMİ:
-   - Senin birikimin kaynaklarımızdan daha geniş, eğer Contex1 veya Context2'de doğrudan soruya yanıt olabilecek bir bilgi yoksa kendi bilginden (veya contextlerden destek alarak) yanıt verebilirsin. 
+   - Senin birikimin kaynaklarımızdan daha geniş, eğer Context1 veya Context2'de doğrudan soruya yanıt olabilecek bir bilgi yoksa kendi bilginden (veya contextlerden destek alarak) yanıt verebilirsin. 
    - Genel sorular: Kendi bilgin + Context1
-   - İstatistik sorular: Context2 + Context1  + Kendi bilgin 
+   - İstatistik sorular: Context2 + Context1 + Kendi bilgin 
    - Önceki konuşma varsa: gerekliyse bağlamı dikkate al (daha çok son konuşmalar)
 
-3. KAYNAK BELİRTME: Kaynakları kullandıysan sonda parantez içi belirt.
-   - YÖK Raporu bilgisi → "Kaynak: YÖK Üniversite İzleme Raporu 2024"
-   - İZÜ rehberi → "Kaynak: İZÜ YKS Tercih Rehberi"
-   - CSV verileri → "Kaynak: 2024 Cumhurbaşkanlığı Uni-Veri"
-   - Bilincli Tercih → "Bilincli Tercih: Üniversite Seçerken (Prof. Dr. Erhan Erkut)"
-   - Genel bilgi → "Kaynak: Genel rehberlik bilgisi"
+3. KAYNAK BELİRTME: 
+   - SADECE CSV verilerinden rakam/oran/istatistik paylaşırken:
+     "2024 Cumhurbaşkanlığı Uni-Veri Veritabanında yer alan bilgiye göre..."
+   - Diğer tüm durumlarda kaynak belirtme
 
 YANIT KURALLARI:
 • 3-5 cümle, net ve objektif
@@ -141,7 +139,7 @@ YANIT KURALLARI:
 
 Yanıt:"""
 
-# CSV Tetikleyici Kelimeler - Daha spesifik
+# CSV Tetikleyici Kelimeler - Değişiklik yok
 CSV_KEYWORDS = [
     # Temel İstatistik Sorular
     "istihdam oranı", "çalışma oranı", "iş bulma", "mezun istihdamı",
