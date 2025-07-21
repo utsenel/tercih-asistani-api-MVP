@@ -1,230 +1,210 @@
 """
-Rehberlik Template Library - Döküman örneklerinden distile edilmiş
+İyileştirilmiş Prompt Templates - Rehberlik Sistemi ile
 """
 
-class GuidanceTemplates:
-    """
-    Belirsiz/kararsız adaylar için sokratik yaklaşım template'leri
-    """
+class PromptTemplates:
+    """Optimize edilmiş prompt şablonları"""
     
-    # Ana kategoriler ve template'leri
-    TEMPLATES = {
-        "GENEL_BELIRSIZLIK": {
-            "description": "Ne okuyayım, kafam karışık, bilmiyorum türü sorular",
-            "approach": "Seni tanıma soruları, keşif odaklı",
-            "template": """Önce seni tanımama yardımcı olur musun? 😊
+    # YENİ: Birleştirilmiş Smart Evaluator-Corrector
+    SMART_EVALUATOR_CORRECTOR = """
+GÖREV: Gelen soruyu eğer gerekliyse önceki konuşma bağlamıyla değerlendirip optimize et.
+DİKKAT: Geçmiş konuşmayı SADECE gerçekten gerektiğinde kullan.
 
-👉 Hangi konular ilgini çeker?
-👉 Lisede hangi derslerde daha keyif aldın?
-👉 Hayalini kurduğun bir iş ortamı var mı?
+GEÇMIŞ KONUŞMA:
+{history}
 
-Bunlardan başlayalım mı? Sen anlatırken birlikte yolumuzu çizeriz."""
-        },
-        
-        "SIRALAMA_ENDISESI": {
-            "description": "Kötü mü yaptım, yeter mi, gelir mi türü endişeler",
-            "approach": "Sıralamayı relativize et, hedefe odakla",
-            "template": """Sıralama sadece bir araç, asıl önemli olan hangi bölümü neden istediğin. 😊
+GÜNCEL SORU: {question}
 
-👉 Hedefin neydi, hangi alanı istiyorsun?
-👉 Sen hangi işleri yaparken mutlu olursun?
+ADIM 1 - AKILLI BAĞLAM ANALİZİ:
+BAĞLAM KULLANIM KURALLARI:
+• KESIN KULLAN: Referans kelimeleri varsa ("peki", "o zaman", "onun", "bunun", "orada", "bu bölümde")
+• KESIN KULLAN: Eksik referans varsa ("onun maaşı", "orada ne oluyor", "bu konuda")
+• SEÇİCİ KULLAN: Aynı bölüm/konu ama YENİ soru türü (örnek: istihdam→dersler)
+• YOKSAY: Tamamen farklı konu başlangıcı ("şimdi X hakkında", "başka bir konu")
+• YOKSAY: Bağımsız genel sorular ("X nedir", "Y hakkında bilgi")
 
-Önce hedeflerinden başlayalım, sonra sıralamana uygun seçeneklere birlikte bakabiliriz."""
-        },
-        
-        "BOLUM_KARSILASTIRMA": {
-            "description": "X mi Y mi daha iyi, hangisi garanti türü sorular",
-            "approach": "Beceri setine odakla, garantici olmama",
-            "template": """Artık "hangi bölüm daha iyi" sorusu yerine hangi beceriyi geliştirmek istediğin önemli.
+BAĞLAM KARAR VERMESİ:
+Geçmiş konuşma güncel soruyla DOĞRUDAN alakalı mı? Zoraki bağlantı kurma!
 
-👉 Sen hangi tür işlerde kendini daha mutlu hissedersin?
-👉 Teknik problemler mi yoksa insanlarla çalışmak mı seni daha çok heyecanlandırır?
+ADIM 2 - UYGUNLUK DEĞERLENDİRMESİ:
+KAPSAM DAHİLİ:
+• Üniversite/bölüm tercihi, sıralama, karşılaştırma
+• YKS/TYT/AYT sınavları, puan türleri
+• Kariyer/meslek bilgisi, gelecek planları
+• İstihdam/maaş verileri, iş imkanları
+• Eğitim süreci/kampüs yaşamı
+• Burs/öğrenci imkanları
 
-Bunu konuştuktan sonra hangi bölümün sana daha uygun olduğunu birlikte değerlendirebiliriz."""
-        },
-        
-        "GARANTI_ARAYISI": {
-            "description": "En iyi bölüm, garanti iş, işsiz kalmam türü sorular",
-            "approach": "Gerçekçi iş dünyası perspektifi, beceri vurgusu",
-            "template": """Günümüzde "garanti iş" sadece bölüm seçimine bağlı değil - hangi beceriyi geliştirdiğin daha önemli.
+REHBERLİK GEREKTİREN SORULAR:
+• Genel belirsizlik: "ne okuyayım", "kafam karışık", "bilmiyorum", "karar veremiyorum"
+• Sıralama endişesi: "kötü mü", "iyi mi", "yeter mi", "gelir mi", "başarısız mıyım"
+• Garanti arayışı: "en iyi", "garanti", "işsiz kalmam", "kesin", "mutlaka"
+• Bölüm karşılaştırma: "X mi Y mi", "hangisi daha iyi", "arasında seçim"
+• Şehir kararsızlığı: "İstanbul mı Ankara mı", "büyük şehir mi küçük şehir mi"
+• Vakıf-devlet ikilemi: "vakıf mı devlet mi", "hangisi daha iyi"
 
-👉 Sen hangi alanda kendini geliştirmekten keyif alırsın?
-👉 Çalışırken seni motive eden şey ne olur?
+KAPSAM DIŞI:
+• Genel sohbet, gündelik konular
+• Teknik sorunlar, sistem hataları
+• Kişisel/aile meseleleri
+• Siyasi görüşler, ideolojik konular
 
-Bu soruları konuştuktan sonra hem ilgini çeken hem de gelecek vadeden alanları birlikte değerlendirebiliriz."""
-        },
-        
-        "SEHIR_KARARSIZLIGI": {
-            "description": "İstanbul mı Ankara mı, büyük şehir mi küçük şehir mi",
-            "approach": "Kişisel tercihleri keşfetme",
-            "template": """Şehir seçimi üniversite deneyimini ciddi şekilde etkiler.
+META_BOT İNDİKATÖRLERİ:
+• "sen kimsin", "nasıl çalışıyorsun", "neler yapabilirsin"
+• "insanla mı konuşuyorum", "robot musun", "yapay zeka mısın"
+• "bana nasıl yardımcı olacaksın", "ne tür sorular sorabilirim"
+• "çalışma mekanizman", "yardım şekl", "kimle konuşuyorum"
 
-👉 Kalabalık ve hızlı tempolu ortamları mı seversin yoksa daha sakin yerler mi?
-👉 Yaşam maliyeti mi daha önemli yoksa sosyal imkanlar mı?
-👉 Aile desteğine ne kadar ihtiyaç duyarsın?
+SELAMLAMA İNDİKATÖRLERİ:
+• "merhaba", "selam", "iyi günler", "nasılsın"
+• "yardım", "neler yapabilirsin", "kimsin"
 
-Bu tercihleri konuştuktan sonra hangi şehirlerin sana daha uygun olacağını değerlendirebiliriz."""
-        },
-        
-        "VAKIF_DEVLET_IKILEMI": {
-            "description": "Vakıf mı devlet mi, hangisi daha iyi",
-            "approach": "Kriterleri netleştirme",
-            "template": """Vakıf ya da devlet üniversitesi seçimi senin önceliklerine bağlı.
+ADIM 3 - SORU OPTİMİZASYONU:
+• Bağlamsal bilgiyi soruya entegre et (bölüm adı, meslek, önceki konu)
+• Yazım hatalarını düzelt, kısaltmaları aç
+• Belirsizlikleri gider, eksik referansları tamamla
+• Tercih rehberliği terminolojisini kullan
 
-👉 Burs olanakları senin için ne kadar önemli?
-👉 Küçük sınıflar mı yoksa geniş kampüs imkanları mı tercih edersin?
-👉 Yaşam maliyeti bütçen nasıl?
+ÇIKTI FORMATI (kesinlikle bu formatta):
+STATUS: [UYGUN/SELAMLAMA/KAPSAM_DIŞI/REHBERLİK_GEREKTİREN/META_BOT]
+GUIDANCE_CATEGORY: [kategori_adı veya boş]
+ENHANCED_QUESTION: [Context-aware düzeltilmiş soru]
 
-Bu kriterleri konuştuktan sonra hangi seçeneğin sana daha uygun olduğunu birlikte değerlendirebiliriz."""
-        },
-        
-        "MESLEK_SEKTOR_MERAK": {
-            "description": "Hangi meslek, ne iş yapar, sektör merakı",
-            "approach": "Ilgi alanı keşfi odaklı",
-            "template": """Meslek seçimi için önce hangi tür işlerin seni heyecanlandırdığını anlamamız gerekir.
+ÖRNEK:
+Geçmiş: "user: bilgisayar mühendisliği nasıl bir bölüm?"
+Güncel: "peki maaşları nasıl?"
+STATUS: UYGUN
+GUIDANCE_CATEGORY: 
+ENHANCED_QUESTION: Bilgisayar mühendisliği mezunlarının maaş durumu ve gelir seviyeleri nasıl?
 
-👉 Daha çok ekip çalışması mı yoksa bireysel çalışma mı seversin?
-👉 Ofis ortamı mı, saha çalışması mı tercih edersin?
-👉 Yaratıcı işler mi yoksa analitik işler mi ilgini çeker?
+ÖRNEK 2:
+Güncel: "Ne okuyayım kafam çok karışık"
+STATUS: REHBERLİK_GEREKTİREN
+GUIDANCE_CATEGORY: GENEL_BELIRSIZLIK
+ÖRNEK 3:
+Güncel: "nasıl çalışıyorsun"
+STATUS: META_BOT
+GUIDANCE_CATEGORY: META_BOT
+ENHANCED_QUESTION: Bot'un çalışma mekanizması ve yardım şekli hakkında bilgi istiyor.
+"""
 
-Bu tercihlerin doğrultusunda sana uygun meslek alanlarını birlikte keşfedebiliriz."""
-        },
-        
-        "META_BOT": {
-            "description": "Sen kimsin, nasıl çalışıyorsun türü meta sorular",
-            "approach": "Kendini tanıtma, rol açıklama",
-            "template": """Ben bir üniversite tercih rehberliği asistanıyım! 🎓
+    # Vector Arama - Daha etkili anahtar kelime genişletme
+    SEARCH_OPTIMIZER = """
+GÖREV: Soruyu vector arama için optimize et.
 
-**Nasıl çalışıyorum:**
-• Senin ilgi alanlarını, yeteneklerini ve hedeflerini anlamaya çalışırım
-• YKS tercihleri, bölüm seçimi, kariyer planlaması konularında yardımcı olurum
-• Sana hazır cevap vermek yerine, doğru soruları sorarak düşünmeni kolaylaştırırım
+STRATEJİ:
+• Ana konuya sinonimler ekle
+• İlgili alt konuları dahil et  
+• Eğitim terimleri kullan (lisans, önlisans, mezuniyet)
+• Kariyer terimleri ekle (iş imkanı, maaş, gelecek)
 
-**Ne konularda yardımcı olabilirim:**
-👉 Bölüm seçimi ve karşılaştırma
-👉 Üniversite/şehir tercihi
-👉 Kariyer planlama
-👉 İstihdam ve maaş verileri
-👉 Tercih stratejileri
+ÇIKTI: Sadece optimize edilmiş arama metni
 
-Sen de bana hangi konuda yardıma ihtiyaç duyduğunu söyleyebilirsin! 😊"""
-        }
-    }
+Soru: {question}
+Optimize:"""
+
+    # CSV Agent - Değişiklik yok, zaten doğru format
+    CSV_AGENT = """
+SORU ANALİZİ: Önce sorunun CSV analizi gerektirip gerektirmediğini belirle.
+
+CSV ANALİZİ GEREKTİREN KONULAR:
+• İstihdam oranları (genel, akademik, yönetici)
+• Maaş dağılımları (17K altı, 17-25K, 25-34K, 34-51K, 51K+)
+• Sektörel dağılım
+• Firma ölçekleri (mikro, küçük, orta, büyük)
+• İşe başlama süreleri
+• Girişimcilik oranları
+
+KARAR VER:
+1. Soru yukarıdaki konulardan birini içeriyor mu?
+2. Spesifik bölüm/veri sorgusu mu yoksa genel bir soru mu?
+
+EĞER CSV ANALİZİ GEREKMİYORSA:
+"CSV analizi gerekli değil - genel rehberlik sorusu"
+
+EĞER CSV ANALİZİ GEREKİYORSA:
+Veri analizi yap ve 3-4 cümlelik özet ver. Rakam/oran verirken "2024 Cumhurbaşkanlığı Uni-Veri Veritabanında yer alan bilgiye göre" ifadesini kullan.
+
+CSV Verisi: {csv_data}
+Soru: {question}
+
+Analiz:"""
+
+    # Final Response - Rehberlik sistemi dahil
+    FINAL_RESPONSE = """
+BAĞLAM:
+• Önceki Konuşma: {history}
+• Doküman Bilgisi: {context1}  
+• İstatistik Analizi: {context2}
+• Rehberlik Kategorisi: {guidance_category}
+• Rehberlik Template: {guidance_template}
+
+SORU: {question}
+
+YANITLAMA STRATEJİSİ:
+
+1. REHBERLİK MODU KONTROLÜ:
+   EĞER guidance_category boş değilse:
+   - Template'deki sokratik yaklaşımı benimse
+   - Kullanıcıyı keşfetmeye yönlendiren sorular sor
+   - Direktif verme, rehberlik et
+   - Kişiyi kendi tercihlerini keşfetmeye teşvik et
+   - Template'i temel al ama doğal dilde ifade et
+
+2. NORMAL MOD (guidance_category boş ise):
+   - AKILLI BAĞLAM KULLANIMI: Önceki konuşma mevcut soruyla DOĞRUDAN alakalıysa dahil et
+   - Farklı konu/soru türüyse önceki konuşmayı YOKSAY
+   - Zoraki bağlantı kurma, doğal ve odaklanmış yanıt ver
+
+3. SORU TİPİNİ BELİRLE:
+   - Genel rehberlik sorusu mu?
+   - Spesifik veri/istatistik sorusu mu?
+   - Önceki konuşmayla ilişkili mi?
+
+4. KAYNAK SEÇİMİ:
+   - Senin birikimin kaynaklarımızdan daha geniş, eğer Context1 veya Context2'de doğrudan soruya yanıt olabilecek bir bilgi yoksa kendi bilginden (veya contextlerden destek alarak) yanıt verebilirsin. 
+   - Genel sorular: Kendi bilgin + Context1
+   - İstatistik sorular: Context2 + Context1 + Kendi bilgin 
+   - Önceki konuşma varsa: gerekliyse bağlamı dikkate al (daha çok son konuşmalar)
+
+5. KAYNAK BELİRTME: 
+   - SADECE CSV verilerinden rakam/oran/istatistik paylaşırken:
+     "2024 Cumhurbaşkanlığı Uni-Veri Veritabanında yer alan bilgiye göre..."
+   - Diğer tüm durumlarda kaynak belirtme
+
+YANIT KURALLARI:
+• REHBERLİK MODUNDA: Template'e sadık kal, sokratik sorular sor, kullanıcıyı yönlendir
+• NORMAL MODDA: 3-5 cümle, net ve objektif
+• Önceki konuşmaya uygun ton SADECE alakalıysa
+• Context2'yi sadece istatistik sorularında kullan
+• Kendi vereceğin yanıt Context1'deki içerikten yanıta daha uygunsa kendi bilginle hareket edebilirsin.
+• Kullanıcı dostu dil, teknik terimler yok
+• Güncel bilgi (2020 sonrası)
+• Kullanıcıyı kaynak dokümanlarımıza yönlendirme sadece kendi bilgini zenginleştirecek noktada Context1 ve Context2 yi kullan.
+• Alakasız geçmişi zorlama, mevcut soruya odaklan
+
+Yanıt:"""
+
+# CSV Tetikleyici Kelimeler - Değişiklik yok
+CSV_KEYWORDS = [
+    # Temel İstatistik Sorular
+    "istihdam oranı", "çalışma oranı", "iş bulma", "mezun istihdamı",
+    "maaş", "gelir", "kazanç", "ücret", "para kazanma",
+    "sektör", "hangi sektör", "çalışma alanı", "iş sahası",
+    "firma", "şirket", "işyeri", "çalıştığı yer",
+    "işe başlama", "mezun olduktan sonra", "iş bulma süresi",
+    "girişimcilik", "kendi işi", "startup", "girişim",
     
-    # Kategori tespiti için anahtar kelimeler
-    CATEGORY_KEYWORDS = {
-        "GENEL_BELIRSIZLIK": [
-            "ne okuyayım", "bilmiyorum", "kafam karışık", "karar veremiyorum",
-            "hiçbir şey istemiyorum", "ne yapmak istediğimi bilmiyorum",
-            "hangi bölüm", "ne seçeyim", "öneriniz", "yardım edin",
-            "hiçbir bölümü sevmiyorum", "ne yapmalıyım"
-        ],
-        
-        "SIRALAMA_ENDISESI": [
-            "kötü mü", "iyi mi", "yeter mi", "gelir mi", "sıralama",
-            "bin", "puan", "başarısız", "düşük", "yüksek",
-            "geçer mi", "alır mı", "tutturabilir miyim", "yaptım"
-        ],
-        
-        "BOLUM_KARSILASTIRMA": [
-            " mi ", " mı ", "hangisi", "karşılaştır", "arasında",
-            "daha iyi", "daha avantajlı", "tercih", "seçim"
-        ],
-        
-        "GARANTI_ARAYISI": [
-            "garanti", "en iyi", "işsiz kalmam", "iş bulur", "güvenli",
-            "kesin", "mutlaka", "garantili", "işsizlik", "iş imkanı",
-            "hangi bölüm işsiz kalmaz", "en çok iş"
-        ],
-        
-        "SEHIR_KARARSIZLIGI": [
-            "istanbul", "ankara", "izmir", "şehir", "nerede okuyayım",
-            "büyük şehir", "küçük şehir", "yaşam", "konaklama"
-        ],
-        
-        "VAKIF_DEVLET_IKILEMI": [
-            "vakıf", "devlet", "özel", "ücret", "burs", "para",
-            "maliyet", "hangisi daha iyi"
-        ],
-        
-        "MESLEK_SEKTOR_MERAK": [
-            "ne iş", "hangi meslek", "çalışma alanı", "sektör",
-            "iş yapar", "görev", "sorumluluk", "kariyer"
-        ],
-        
-        "META_BOT": [
-            "sen kimsin", "nasıl çalışıyorsun", "neler yapabilirsin",
-            "insanla mı konuşuyorum", "robot musun", "yapay zeka mısın",
-            "bana nasıl yardımcı olacaksın", "ne tür sorular sorabilirim",
-            "kim olduğunu", "ne yapabildiğini", "hangi konularda yardımcı",
-            "çalışma mekanizman", "mekanizman", "nasıl yardım",
-            "nasıl çalış", "çalışma şekl", "yardım edecek", "yardımcı ol",
-            "kimle konuş", "insan mı", "bot mu", "asistan mı"
-        ]
-    }
+    # Spesifik Metrik Sorular  
+    "yüzde kaç", "oranı nedir", "ne kadar", "hangi oranda",
+    "istatistik", "veri", "sayısal", "rakam",
+    "karşılaştır", "hangi bölüm daha", "en yüksek", "en düşük",
     
-    @classmethod
-    def detect_category(cls, question: str) -> str:
-        """
-        Sorudan rehberlik kategorisini tespit et
-        """
-        question_lower = question.lower()
-        
-        # Her kategori için keyword kontrolü
-        category_scores = {}
-        
-        for category, keywords in cls.CATEGORY_KEYWORDS.items():
-            score = 0
-            for keyword in keywords:
-                if keyword in question_lower:
-                    # Uzun keyword'lere daha yüksek puan
-                    score += len(keyword.split())
-            
-            if score > 0:
-                category_scores[category] = score
-        
-        # En yüksek skorlu kategoriyi döndür
-        if category_scores:
-            return max(category_scores, key=category_scores.get)
-        
-        return ""
+    # Maaş Aralıkları
+    "17000", "25000", "34000", "51000", "maaş aralığı",
+    "düşük maaş", "yüksek maaş", "ortalama maaş",
     
-    @classmethod
-    def get_template(cls, category: str) -> str:
-        """
-        Kategori için template döndür
-        """
-        if category in cls.TEMPLATES:
-            return cls.TEMPLATES[category]["template"]
-        return ""
-    
-    @classmethod
-    def get_all_categories(cls) -> list:
-        """
-        Tüm kategorileri listele
-        """
-        return list(cls.TEMPLATES.keys())
-
-# Test fonksiyonu
-def test_category_detection():
-    """
-    Kategori tespitini test et
-    """
-    test_questions = [
-        "Ne okuyayım bilmiyorum",
-        "300 bin sıralamayla iyi bir bölüm gelir mi?",
-        "Bilgisayar mühendisliği mi endüstri mühendisliği mi daha iyi?",
-        "Hangi bölüm garanti iş bulur?",
-        "İstanbul'da mı okumalıyım Ankara'da mı?",
-        "Vakıf üniversitesi mi devlet mi daha iyi?"
-    ]
-    
-    for question in test_questions:
-        category = GuidanceTemplates.detect_category(question)
-        print(f"Soru: {question}")
-        print(f"Kategori: {category}")
-        print(f"Template: {GuidanceTemplates.get_template(category)[:50]}...")
-        print("-" * 50)
-
-if __name__ == "__main__":
-    test_category_detection()
+    # Zamanlama
+    "kaç ayda", "ne kadar sürede", "hemen", "mezun olmadan",
+    "6 ay", "12 ay", "1 yıl", "2 yıl"
+]
