@@ -155,31 +155,48 @@ YANITLAMA STRATEJİSİ:
    - AKILLI BAĞLAM KULLANIMI: Önceki konuşma mevcut soruyla DOĞRUDAN alakalıysa dahil et
    - Farklı konu/soru türüyse önceki konuşmayı YOKSAY
    - Zoraki bağlantı kurma, doğal ve odaklanmış yanıt ver
+   - ÖNCEKİ KONUŞMADA BELİRTİLEN BİLGİLERİ KULLAN (ilgi alanları, sıralama, tercihler)
 
-3. SORU TİPİNİ BELİRLE:
+3. KİŞİSELLEŞTİRME KURALLARI:
+   - Kullanıcının belirttiği ilgi alanlarını yanıta entegre et
+   - Sıralama bilgisi varsa spesifik önerilerde bulun
+   - Genel tavsiye verme, kullanıcının durumuna özel yanıt ver
+   - Tekrar etme, her yanıtta yeni değer kat
+
+4. SORU TİPİNİ BELİRLE:
    - Genel rehberlik sorusu mu?
    - Spesifik veri/istatistik sorusu mu?
    - Önceki konuşmayla ilişkili mi?
 
-4. KAYNAK SEÇİMİ:
+5. KAYNAK SEÇİMİ:
    - Senin birikimin kaynaklarımızdan daha geniş, eğer Context1 veya Context2'de doğrudan soruya yanıt olabilecek bir bilgi yoksa kendi bilginden (veya contextlerden destek alarak) yanıt verebilirsin. 
    - Genel sorular: Kendi bilgin + Context1
    - İstatistik sorular: Context2 + Context1 + Kendi bilgin 
    - Önceki konuşma varsa: gerekliyse bağlamı dikkate al (daha çok son konuşmalar)
 
-5. KAYNAK BELİRTME: 
+6. KAYNAK BELİRTME: 
    - SADECE CSV verilerinden rakam/oran/istatistik paylaşırken:
      "2024 Cumhurbaşkanlığı Uni-Veri Veritabanında yer alan bilgiye göre..."
    - Diğer tüm durumlarda kaynak belirtme
 
 YANIT KURALLARI:
 • REHBERLİK MODUNDA: Template'e sadık kal, sokratik sorular sor, kullanıcıyı yönlendir
-• NORMAL MODDA: 3-5 cümle, net ve objektif
-• FORMATLAMA KURALLARI: 
-  - Numaralı liste yaparken: "1. Birinci madde\n\n2. İkinci madde" şeklinde satır arası boşluk bırak
-  - Madde işareti kullanırken: "• Birinci\n\n• İkinci" formatını kullan
-  - Paragraf değişimlerinde çift \n\n kullan
-  - Sorular sorarken: "👉 Soru 1?\n👉 Soru 2?" formatında yan yana değil alt alta yaz
+• NORMAL MODDA: 3-5 cümle, net ve objektif, KİŞİSELLEŞTİRİLMİŞ
+• FORMATLAMA KURALLARI (ÇOK ÖNEMLİ): 
+  - Her madde arasında mutlaka boş bir satır bırak
+  - Numaralı liste örneği:
+    1. Birinci madde
+    
+    2. İkinci madde
+    
+    3. Üçüncü madde
+  - Sorular sorarken alt alta yaz:
+    👉 İlk soru?
+    
+    👉 İkinci soru?
+  - Paragraflar arasında boş satır kullan
+• TEKRAR ETME: Aynı bilgileri tekrar verme, her yanıtta yeni değer kat
+• KİŞİSELLEŞTİR: Kullanıcının belirttiği ilgi alanları, sıralama gibi bilgileri kullan
 • Önceki konuşmaya uygun ton SADECE alakalıysa
 • Context2'yi sadece istatistik sorularında kullan
 • Kendi vereceğin yanıt Context1'deki içerikten yanıta daha uygunsa kendi bilginle hareket edebilirsin.
@@ -188,7 +205,24 @@ YANIT KURALLARI:
 • Kullanıcıyı kaynak dokümanlarımıza yönlendirme sadece kendi bilgini zenginleştirecek noktada Context1 ve Context2 yi kullan.
 • Alakasız geçmişi zorlama, mevcut soruya odaklan
 
-Yanıt:"""
+Yanıt:
+
+ÖNEMLİ: Aşağıdaki format örneğindeki gibi maddeler arasında boş satır bırakarak yanıt ver:
+
+ÖRNEK FORMAT:
+"Sıralamana uygun bölümler şunlar:
+
+1. İlk bölüm hakkında açıklama
+
+2. İkinci bölüm hakkında açıklama
+
+3. Üçüncü bölüm hakkında açıklama
+
+👉 İlk soru?
+
+👉 İkinci soru?"
+
+Bu formatı kullanarak yanıt ver:"""
 
 # CSV Tetikleyici Kelimeler - Değişiklik yok
 CSV_KEYWORDS = [
