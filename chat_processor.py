@@ -335,7 +335,7 @@ class TercihAsistaniProcessor:
             return {"status": "UYGUN", "enhanced_question": message}
 
     async def process_message(self, message: str, session_id: str = "default") -> Dict[str, Any]:
-        """YENİ akış ile mesaj işleme - Detaylı performans izleme"""
+        """YENİ akış ile mesaj işleme - Sources kaldırıldı"""
         start_time = time.time()
         
         try:
@@ -359,7 +359,7 @@ class TercihAsistaniProcessor:
                 logger.info(f"Out of scope request completed in {total_time:.2f}s")
                 return {
                     "response": MessageSettings.ERROR_EXPERTISE_OUT,
-                    "sources": []
+                    "metadata": {"processing_time": round(total_time, 2)}
                 }
             
             if status == "SELAMLAMA":
@@ -367,7 +367,7 @@ class TercihAsistaniProcessor:
                 logger.info(f"Greeting request completed in {total_time:.2f}s")
                 return {
                     "response": "Merhaba! Ben bir üniversite tercih asistanıyım. Size YKS tercihleri, bölüm seçimi, kariyer planlaması konularında yardımcı olabilirim. Hangi konuda bilgi almak istiyorsunuz?",
-                    "sources": []
+                    "metadata": {"processing_time": round(total_time, 2)}
                 }
             
             # Adım 3: PARALEL İŞLEMLER - Enhanced question ile
@@ -457,7 +457,6 @@ class TercihAsistaniProcessor:
             
             return {
                 "response": final_response,
-                "sources": self._extract_sources(context1, context2),
                 "metadata": {
                     "processing_time": round(total_time, 2),
                     **({
@@ -476,7 +475,6 @@ class TercihAsistaniProcessor:
             logger.error(f"Message processing error ({total_time:.2f}s): {e}")
             return {
                 "response": MessageSettings.ERROR_GENERAL,
-                "sources": [],
                 "metadata": {"error": str(e), "processing_time": round(total_time, 2)}
             }                                            
 
@@ -555,35 +553,15 @@ class TercihAsistaniProcessor:
                         if not content:
                             continue
                         
-                        # Kaynak bilgisi
-                        source = "Unknown source"
-                        if 'metadata' in doc and isinstance(doc['metadata'], dict):
-                            metadata = doc['metadata']
-                            source = metadata.get('source', metadata.get('file_path', metadata.get('filename', source)))
-                        elif 'source' in doc:
-                            source = doc['source']
-                        elif 'file_path' in doc:
-                            source = doc['file_path']
-                        
                         # İçeriği kısalt
                         if len(content) > 800:
                             content = content[:800] + "..."
                         
-                        # Kaynak formatını düzelt
-                        if isinstance(source, str):
-                            source_name = source.split('/')[-1] if '/' in source else source
-                            if any(char in source_name for char in ['Ä°', 'ZÃ', 'Ã', 'Â']):
-                                source_name = "İZÜ YKS Tercih Rehberi.pdf"
-                            if not source_name or source_name == "Unknown source":
-                                source_name = "Tercih Rehberi"
-                        else:
-                            source_name = "Rehber Dokümanı"
-                        
-                        context_parts.append(f"**Kaynak**: {source_name}\n**İçerik**: {content}")
+                        context_parts.append(content)
                         total_chars += len(content)
                         
                         if AppSettings.LOG_VECTOR_DETAILS:
-                            logger.debug(f"Document {i+1} processed: {source_name} - {len(content)} chars")
+                            logger.debug(f"Document {i+1} processed: {len(content)} chars")
                         
                         if total_chars > 2000:
                             break
@@ -755,40 +733,6 @@ class TercihAsistaniProcessor:
         except Exception as e:
             logger.error(f"Final response error: {e}")
             return "Error occurred while generating response."
-
-    def _extract_sources(self, context1: str, context2: str) -> List[str]:
-        """Kaynak çıkarma"""
-        sources = []
-        
-        # Vector context kontrolü
-        if context1 and len(context1.strip()) > 50:
-            error_keywords = ["bulunamadı", "başarısız", "mevcut değil", "hata", "failed", "unavailable", "error"]
-            has_error = any(keyword in context1.lower() for keyword in error_keywords)
-            
-            if not has_error:
-                if "İZÜ" in context1 or "tercih rehberi" in context1.lower():
-                    sources.append(MessageSettings.SOURCES["IZU_GUIDE"])
-                elif "yök" in context1.lower():
-                    sources.append(MessageSettings.SOURCES["YOK_REPORT"])
-                else:
-                    sources.append(MessageSettings.SOURCES["IZU_GUIDE"])
-        
-        # CSV context kontrolü
-        if context2 and len(context2.strip()) > 50:
-            csv_error_keywords = ["mevcut değil", "hata", "başarısız", "gerekli değil", "unavailable", "failed", "error", "not required"]
-            has_csv_error = any(keyword in context2.lower() for keyword in csv_error_keywords)
-            
-            if not has_csv_error:
-                csv_success_indicators = ["analiz", "oran", "veri", "bölüm", "istihdam", "maaş", "%", "analysis", "data"]
-                has_csv_content = any(indicator in context2.lower() for indicator in csv_success_indicators)
-                
-                if has_csv_content:
-                    sources.append(MessageSettings.SOURCES["UNIVERI_DB"])
-        
-        if not sources:
-            sources.append(MessageSettings.SOURCES["GENERAL"])
-        
-        return list(dict.fromkeys(sources))
 
     async def test_all_connections(self) -> Dict[str, str]:
         """Bağlantı testleri"""
