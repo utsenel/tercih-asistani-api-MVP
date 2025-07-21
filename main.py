@@ -36,7 +36,7 @@ app.add_middleware(
     allow_headers=AppSettings.CORS_HEADERS,
 )
 
-# Request/Response modelleri - Validation'la
+# Request/Response modelleri - Sources kaldırıldı
 class ChatRequest(BaseModel):
     message: str
     session_id: str = ValidationSettings.DEFAULT_SESSION_ID
@@ -62,7 +62,6 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     response: str
     status: str = "success"
-    sources: list = []
     metadata: dict = {}
     
     class Config:
@@ -70,7 +69,6 @@ class ChatResponse(BaseModel):
             "example": {
                 "response": "Bilgisayar mühendisliği teknik ve analitik...",
                 "status": "success", 
-                "sources": ["YÖK Raporu 2024"],
                 "metadata": {"processing_time": 3.2}
             }
         }
@@ -150,7 +148,6 @@ async def chat_endpoint(request: Request, chat_request: ChatRequest):
         return ChatResponse(
             response=result["response"],
             status="success",
-            sources=result.get("sources", []),
             metadata={
                 "processing_time": processing_time,
                 "session_id": chat_request.session_id,
@@ -173,7 +170,6 @@ async def chat_endpoint(request: Request, chat_request: ChatRequest):
         return ChatResponse(
             response="Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin.",
             status="error",
-            sources=[],
             metadata={
                 "processing_time": processing_time,
                 "error": str(e)[:100]
