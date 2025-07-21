@@ -5,10 +5,11 @@ from pydantic import BaseModel
 import os
 from dotenv import load_dotenv
 import logging
+import time
 
 # Local imports
 from chat_processor import TercihAsistaniProcessor
-from config import AppSettings, ValidationSettings
+from config import AppSettings, ValidationSettings, GuidanceTemplates
 
 # Environment değişkenlerini yükle
 load_dotenv()
@@ -89,7 +90,13 @@ async def root():
     return {
         "message": f"{AppSettings.API_TITLE} çalışıyor!",
         "status": "active",
-        "version": AppSettings.API_VERSION
+        "version": AppSettings.API_VERSION,
+        "features": {
+            "guidance_system": True,
+            "csv_analysis": True,
+            "vector_search": True,
+            "memory_system": True
+        }
     }
 
 @app.get("/health")
@@ -98,12 +105,12 @@ async def health_check():
     return {
         "status": "healthy",
         "version": AppSettings.API_VERSION,
-        "service": AppSettings.API_TITLE
+        "service": AppSettings.API_TITLE,
+        "guidance_categories": len(GuidanceTemplates.TEMPLATES)
     }
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat_endpoint(request: Request, chat_request: ChatRequest): 
-    import time
     start_time = time.time()
     
     try:
@@ -154,7 +161,8 @@ async def chat_endpoint(request: Request, chat_request: ChatRequest):
                 "message_length": len(chat_request.message),
                 **({
                     "client_ip": actual_ip,
-                    "session_transition": f"{original_session_id} → {chat_request.session_id}"
+                    "session_transition": f"{original_session_id} → {chat_request.session_id}",
+                    **result.get("metadata", {})
                 } if AppSettings.DEBUG_MODE else {})
             }
         )
@@ -193,6 +201,44 @@ async def test_connections():
             "status": "error", 
             "error": str(e),
             "timestamp": time.time()
+        }
+
+@app.get("/debug-guidance")
+async def debug_guidance():
+    """
+    Guidance system debug endpoint
+    """
+    try:
+        test_questions = [
+            "Ne okuyayım bilmiyorum",
+            "300 bin sıralamayla iyi bir bölüm gelir mi?",
+            "Bilgisayar mühendisliği mi endüstri mühendisliği mi daha iyi?",
+            "Hangi bölüm garanti iş bulur?",
+            "İstanbul'da mı okumalıyım Ankara'da mı?",
+            "Vakıf üniversitesi mi devlet mi daha iyi?"
+        ]
+        
+        results = []
+        for question in test_questions:
+            category = GuidanceTemplates.detect_category(question)
+            template = GuidanceTemplates.get_template(category)
+            results.append({
+                "question": question,
+                "detected_category": category,
+                "has_template": bool(template),
+                "template_preview": template[:100] + "..." if template else ""
+            })
+        
+        return {
+            "status": "success",
+            "total_categories": len(GuidanceTemplates.TEMPLATES),
+            "test_results": results,
+            "all_categories": GuidanceTemplates.get_all_categories()
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e)
         }
 
 @app.get("/debug-astra")
@@ -251,6 +297,17 @@ async def config_info():
             "sample_rows": CSVConfig.SAMPLE_ROWS,
             "max_rows_full_analysis": CSVConfig.MAX_ROWS_FOR_FULL_ANALYSIS
         },
+        "guidance_config": {
+            "categories": GuidanceTemplates.get_all_categories(),
+            "total_templates": len(GuidanceTemplates.TEMPLATES),
+            "category_details": {
+                category: {
+                    "description": template_data["description"],
+                    "approach": template_data["approach"]
+                }
+                for category, template_data in GuidanceTemplates.TEMPLATES.items()
+            }
+        },
         "api_info": {
             "title": AppSettings.API_TITLE,
             "version": AppSettings.API_VERSION,
@@ -260,9 +317,9 @@ async def config_info():
 
 if __name__ == "__main__":
     import uvicorn
-    import time
     
     logger.info(f"Starting {AppSettings.API_TITLE} v{AppSettings.API_VERSION}")
+    logger.info(f"Guidance System: {len(GuidanceTemplates.TEMPLATES)} categories loaded")
     
     uvicorn.run(
         "main:app", 
