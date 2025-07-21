@@ -181,7 +181,7 @@ YANITLAMA STRATEJİSİ:
 
 YANIT KURALLARI:
 • REHBERLİK MODUNDA: Template'e sadık kal, sokratik sorular sor, kullanıcıyı yönlendir
-• NORMAL MODDA: 3-5 cümle, net ve objektif, KİŞİSELLEŞTİRİLMİŞ
+• NORMAL MODDA: 3-4 cümle, net ve objektif, KİŞİSELLEŞTİRİLMİŞ (maksimum 400 kelime)
 • FORMATLAMA KURALLARI (ÇOK ÖNEMLİ): 
   - Her madde arasında mutlaka boş bir satır bırak
   - Numaralı liste örneği:
@@ -207,7 +207,7 @@ YANIT KURALLARI:
 
 Yanıt:
 
-ÖNEMLİ: Aşağıdaki format örneğindeki gibi maddeler arasında boş satır bırakarak yanıt ver:
+ÖNEMLİ: Aşağıdaki format örneğindeki gibi maddeler arasında boş satır bırakarak yanıt ver. MUTLAKA tam cevap ver, yarıda kesme:
 
 ÖRNEK FORMAT:
 "Sıralamana uygun bölümler şunlar:
@@ -222,7 +222,7 @@ Yanıt:
 
 👉 İkinci soru?"
 
-Bu formatı kullanarak yanıt ver:"""
+Bu formatı kullanarak EKSIKSIZ yanıt ver:"""
 
 # CSV Tetikleyici Kelimeler - Değişiklik yok
 CSV_KEYWORDS = [
