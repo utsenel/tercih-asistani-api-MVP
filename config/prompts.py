@@ -1,11 +1,11 @@
 """
-İyileştirilmiş Prompt Templates - Basitleştirilmiş Kaynak Sistemi
+İyileştirilmiş Prompt Templates - Rehberlik Sistemi ile
 """
 
 class PromptTemplates:
     """Optimize edilmiş prompt şablonları"""
     
-       # YENİ: Birleştirilmiş Smart Evaluator-Corrector
+    # YENİ: Birleştirilmiş Smart Evaluator-Corrector
     SMART_EVALUATOR_CORRECTOR = """
 GÖREV: Gelen soruyu eğer gerekliyse önceki konuşma bağlamıyla değerlendirip optimize et.
 DİKKAT: Geçmiş konuşmayı SADECE gerçekten gerektiğinde kullan.
@@ -26,7 +26,6 @@ BAĞLAM KULLANIM KURALLARI:
 BAĞLAM KARAR VERMESİ:
 Geçmiş konuşma güncel soruyla DOĞRUDAN alakalı mı? Zoraki bağlantı kurma!
 
-
 ADIM 2 - UYGUNLUK DEĞERLENDİRMESİ:
 KAPSAM DAHİLİ:
 • Üniversite/bölüm tercihi, sıralama, karşılaştırma
@@ -35,6 +34,14 @@ KAPSAM DAHİLİ:
 • İstihdam/maaş verileri, iş imkanları
 • Eğitim süreci/kampüs yaşamı
 • Burs/öğrenci imkanları
+
+REHBERLİK GEREKTİREN SORULAR:
+• Genel belirsizlik: "ne okuyayım", "kafam karışık", "bilmiyorum", "karar veremiyorum"
+• Sıralama endişesi: "kötü mü", "iyi mi", "yeter mi", "gelir mi", "başarısız mıyım"
+• Garanti arayışı: "en iyi", "garanti", "işsiz kalmam", "kesin", "mutlaka"
+• Bölüm karşılaştırma: "X mi Y mi", "hangisi daha iyi", "arasında seçim"
+• Şehir kararsızlığı: "İstanbul mı Ankara mı", "büyük şehir mi küçük şehir mi"
+• Vakıf-devlet ikilemi: "vakıf mı devlet mi", "hangisi daha iyi"
 
 KAPSAM DIŞI:
 • Genel sohbet, gündelik konular
@@ -53,14 +60,22 @@ ADIM 3 - SORU OPTİMİZASYONU:
 • Tercih rehberliği terminolojisini kullan
 
 ÇIKTI FORMATI (kesinlikle bu formatta):
-STATUS: [UYGUN/SELAMLAMA/KAPSAM_DIŞI]
+STATUS: [UYGUN/SELAMLAMA/KAPSAM_DIŞI/REHBERLİK_GEREKTİREN]
+GUIDANCE_CATEGORY: [kategori_adı veya boş]
 ENHANCED_QUESTION: [Context-aware düzeltilmiş soru]
 
 ÖRNEK:
 Geçmiş: "user: bilgisayar mühendisliği nasıl bir bölüm?"
 Güncel: "peki maaşları nasıl?"
 STATUS: UYGUN
+GUIDANCE_CATEGORY: 
 ENHANCED_QUESTION: Bilgisayar mühendisliği mezunlarının maaş durumu ve gelir seviyeleri nasıl?
+
+ÖRNEK 2:
+Güncel: "Ne okuyayım kafam çok karışık"
+STATUS: REHBERLİK_GEREKTİREN
+GUIDANCE_CATEGORY: GENEL_BELIRSIZLIK
+ENHANCED_QUESTION: Üniversite tercih sürecinde kararsızlık yaşıyorum, hangi bölümü seçeceğimi bilmiyorum.
 """
 
     # Vector Arama - Daha etkili anahtar kelime genişletme
@@ -105,41 +120,51 @@ Soru: {question}
 
 Analiz:"""
 
-    # Final Response - Güçlendirilmiş bağlam kontrolü
+    # Final Response - Rehberlik sistemi dahil
     FINAL_RESPONSE = """
 BAĞLAM:
 • Önceki Konuşma: {history}
 • Doküman Bilgisi: {context1}  
 • İstatistik Analizi: {context2}
+• Rehberlik Kategorisi: {guidance_category}
+• Rehberlik Template: {guidance_template}
 
 SORU: {question}
 
 YANITLAMA STRATEJİSİ:
 
-1. AKILLI BAĞLAM KULLANIMI:
-   - Önceki konuşma mevcut soruyla DOĞRUDAN alakalıysa dahil et
+1. REHBERLİK MODU KONTROLÜ:
+   EĞER guidance_category boş değilse:
+   - Template'deki sokratik yaklaşımı benimse
+   - Kullanıcıyı keşfetmeye yönlendiren sorular sor
+   - Direktif verme, rehberlik et
+   - Kişiyi kendi tercihlerini keşfetmeye teşvik et
+   - Template'i temel al ama doğal dilde ifade et
+
+2. NORMAL MOD (guidance_category boş ise):
+   - AKILLI BAĞLAM KULLANIMI: Önceki konuşma mevcut soruyla DOĞRUDAN alakalıysa dahil et
    - Farklı konu/soru türüyse önceki konuşmayı YOKSAY
    - Zoraki bağlantı kurma, doğal ve odaklanmış yanıt ver
-   - Örnek: İstihdam sorusundan sonra "dersler" sorusu → farklı konu, bağlam gereksiz
 
-2. SORU TİPİNİ BELİRLE:
+3. SORU TİPİNİ BELİRLE:
    - Genel rehberlik sorusu mu?
    - Spesifik veri/istatistik sorusu mu?
    - Önceki konuşmayla ilişkili mi?
 
-3. KAYNAK SEÇİMİ:
+4. KAYNAK SEÇİMİ:
    - Senin birikimin kaynaklarımızdan daha geniş, eğer Context1 veya Context2'de doğrudan soruya yanıt olabilecek bir bilgi yoksa kendi bilginden (veya contextlerden destek alarak) yanıt verebilirsin. 
    - Genel sorular: Kendi bilgin + Context1
    - İstatistik sorular: Context2 + Context1 + Kendi bilgin 
    - Önceki konuşma varsa: gerekliyse bağlamı dikkate al (daha çok son konuşmalar)
 
-4. KAYNAK BELİRTME: 
+5. KAYNAK BELİRTME: 
    - SADECE CSV verilerinden rakam/oran/istatistik paylaşırken:
      "2024 Cumhurbaşkanlığı Uni-Veri Veritabanında yer alan bilgiye göre..."
    - Diğer tüm durumlarda kaynak belirtme
 
 YANIT KURALLARI:
-• 3-5 cümle, net ve objektif
+• REHBERLİK MODUNDA: Template'e sadık kal, sokratik sorular sor, kullanıcıyı yönlendir
+• NORMAL MODDA: 3-5 cümle, net ve objektif
 • Önceki konuşmaya uygun ton SADECE alakalıysa
 • Context2'yi sadece istatistik sorularında kullan
 • Kendi vereceğin yanıt Context1'deki içerikten yanıta daha uygunsa kendi bilginle hareket edebilirsin.
