@@ -53,6 +53,7 @@ META_BOT İNDİKATÖRLERİ:
 • "sen kimsin", "nasıl çalışıyorsun", "neler yapabilirsin"
 • "insanla mı konuşuyorum", "robot musun", "yapay zeka mısın"
 • "bana nasıl yardımcı olacaksın", "ne tür sorular sorabilirim"
+• "çalışma mekanizman", "yardım şekl", "kimle konuşuyorum"
 
 SELAMLAMA İNDİKATÖRLERİ:
 • "merhaba", "selam", "iyi günler", "nasılsın"
@@ -80,7 +81,11 @@ ENHANCED_QUESTION: Bilgisayar mühendisliği mezunlarının maaş durumu ve geli
 Güncel: "Ne okuyayım kafam çok karışık"
 STATUS: REHBERLİK_GEREKTİREN
 GUIDANCE_CATEGORY: GENEL_BELIRSIZLIK
-ENHANCED_QUESTION: Üniversite tercih sürecinde kararsızlık yaşıyorum, hangi bölümü seçeceğimi bilmiyorum.
+ÖRNEK 3:
+Güncel: "nasıl çalışıyorsun"
+STATUS: META_BOT
+GUIDANCE_CATEGORY: META_BOT
+ENHANCED_QUESTION: Bot'un çalışma mekanizması ve yardım şekli hakkında bilgi istiyor.
 """
 
     # Vector Arama - Daha etkili anahtar kelime genişletme
@@ -170,6 +175,11 @@ YANITLAMA STRATEJİSİ:
 YANIT KURALLARI:
 • REHBERLİK MODUNDA: Template'e sadık kal, sokratik sorular sor, kullanıcıyı yönlendir
 • NORMAL MODDA: 3-5 cümle, net ve objektif
+• FORMATLAMA KURALLARI: 
+  - Numaralı liste yaparken: "1. Birinci madde\n\n2. İkinci madde" şeklinde satır arası boşluk bırak
+  - Madde işareti kullanırken: "• Birinci\n\n• İkinci" formatını kullan
+  - Paragraf değişimlerinde çift \n\n kullan
+  - Sorular sorarken: "👉 Soru 1?\n👉 Soru 2?" formatında yan yana değil alt alta yaz
 • Önceki konuşmaya uygun ton SADECE alakalıysa
 • Context2'yi sadece istatistik sorularında kullan
 • Kendi vereceğin yanıt Context1'deki içerikten yanıta daha uygunsa kendi bilginle hareket edebilirsin.
