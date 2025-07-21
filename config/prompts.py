@@ -8,18 +8,23 @@ class PromptTemplates:
        # YENİ: Birleştirilmiş Smart Evaluator-Corrector
     SMART_EVALUATOR_CORRECTOR = """
 GÖREV: Gelen soruyu eğer gerekliyse önceki konuşma bağlamıyla değerlendirip optimize et.
-DİKKAT: Her soru geçmiş konuşmaya ihtiyaç duymayabilir.
+DİKKAT: Geçmiş konuşmayı SADECE gerçekten gerektiğinde kullan.
 
 GEÇMIŞ KONUŞMA:
 {history}
 
 GÜNCEL SORU: {question}
 
-ADIM 1 - BAĞLAM ANALİZİ:
-• Sorunun önceki konuşma ile zenginleşmesi gerekiyor mu ona karar ver.
-• Önceki konuşmada spesifik bir bölüm/konu/meslek var mı?
-• Güncel soru önceki konuşmayla ilişkili mi? ("peki", "o zaman", "bunun" gibi bağlayıcılar)
-• Eksik referans var mı? ("onun maaşı", "bu bölümde", "orada" gibi)
+ADIM 1 - AKILLI BAĞLAM ANALİZİ:
+BAĞLAM KULLANIM KURALLARI:
+• KESIN KULLAN: Referans kelimeleri varsa ("peki", "o zaman", "onun", "bunun", "orada", "bu bölümde")
+• KESIN KULLAN: Eksik referans varsa ("onun maaşı", "orada ne oluyor", "bu konuda")
+• SEÇİCİ KULLAN: Aynı bölüm/konu ama YENİ soru türü (örnek: istihdam→dersler)
+• YOKSAY: Tamamen farklı konu başlangıcı ("şimdi X hakkında", "başka bir konu")
+• YOKSAY: Bağımsız genel sorular ("X nedir", "Y hakkında bilgi")
+
+BAĞLAM KARAR VERMESİ:
+Geçmiş konuşma güncel soruyla DOĞRUDAN alakalı mı? Zoraki bağlantı kurma!
 
 
 ADIM 2 - UYGUNLUK DEĞERLENDİRMESİ:
@@ -100,7 +105,7 @@ Soru: {question}
 
 Analiz:"""
 
-    # Final Response - Basitleştirilmiş kaynak sistemi
+    # Final Response - Güçlendirilmiş bağlam kontrolü
     FINAL_RESPONSE = """
 BAĞLAM:
 • Önceki Konuşma: {history}
@@ -111,31 +116,37 @@ SORU: {question}
 
 YANITLAMA STRATEJİSİ:
 
-1. SORU TİPİNİ BELİRLE:
+1. AKILLI BAĞLAM KULLANIMI:
+   - Önceki konuşma mevcut soruyla DOĞRUDAN alakalıysa dahil et
+   - Farklı konu/soru türüyse önceki konuşmayı YOKSAY
+   - Zoraki bağlantı kurma, doğal ve odaklanmış yanıt ver
+   - Örnek: İstihdam sorusundan sonra "dersler" sorusu → farklı konu, bağlam gereksiz
+
+2. SORU TİPİNİ BELİRLE:
    - Genel rehberlik sorusu mu?
    - Spesifik veri/istatistik sorusu mu?
    - Önceki konuşmayla ilişkili mi?
 
-2. KAYNAK SEÇİMİ:
+3. KAYNAK SEÇİMİ:
    - Senin birikimin kaynaklarımızdan daha geniş, eğer Context1 veya Context2'de doğrudan soruya yanıt olabilecek bir bilgi yoksa kendi bilginden (veya contextlerden destek alarak) yanıt verebilirsin. 
    - Genel sorular: Kendi bilgin + Context1
    - İstatistik sorular: Context2 + Context1 + Kendi bilgin 
    - Önceki konuşma varsa: gerekliyse bağlamı dikkate al (daha çok son konuşmalar)
 
-3. KAYNAK BELİRTME: 
+4. KAYNAK BELİRTME: 
    - SADECE CSV verilerinden rakam/oran/istatistik paylaşırken:
      "2024 Cumhurbaşkanlığı Uni-Veri Veritabanında yer alan bilgiye göre..."
    - Diğer tüm durumlarda kaynak belirtme
 
 YANIT KURALLARI:
 • 3-5 cümle, net ve objektif
-• Önceki konuşmaya uygun ton
+• Önceki konuşmaya uygun ton SADECE alakalıysa
 • Context2'yi sadece istatistik sorularında kullan
 • Kendi vereceğin yanıt Context1'deki içerikten yanıta daha uygunsa kendi bilginle hareket edebilirsin.
 • Kullanıcı dostu dil, teknik terimler yok
 • Güncel bilgi (2020 sonrası)
 • Kullanıcıyı kaynak dokümanlarımıza yönlendirme sadece kendi bilgini zenginleştirecek noktada Context1 ve Context2 yi kullan.
-• Alakalı değilse historyden bahsetme.
+• Alakasız geçmişi zorlama, mevcut soruya odaklan
 
 Yanıt:"""
 
