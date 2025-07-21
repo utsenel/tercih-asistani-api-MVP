@@ -88,6 +88,26 @@ Bu kriterleri konuştuktan sonra hangi seçeneğin sana daha uygun olduğunu bir
 👉 Yaratıcı işler mi yoksa analitik işler mi ilgini çeker?
 
 Bu tercihlerin doğrultusunda sana uygun meslek alanlarını birlikte keşfedebiliriz."""
+        },
+        
+        "META_BOT": {
+            "description": "Sen kimsin, nasıl çalışıyorsun türü meta sorular",
+            "approach": "Kendini tanıtma, rol açıklama",
+            "template": """Ben bir üniversite tercih rehberliği asistanıyım! 🎓
+
+**Nasıl çalışıyorum:**
+• Senin ilgi alanlarını, yeteneklerini ve hedeflerini anlamaya çalışırım
+• YKS tercihleri, bölüm seçimi, kariyer planlaması konularında yardımcı olurum
+• Sana hazır cevap vermek yerine, doğru soruları sorarak düşünmeni kolaylaştırırım
+
+**Ne konularda yardımcı olabilirim:**
+👉 Bölüm seçimi ve karşılaştırma
+👉 Üniversite/şehir tercihi
+👉 Kariyer planlama
+👉 İstihdam ve maaş verileri
+👉 Tercih stratejileri
+
+Sen de bana hangi konuda yardıma ihtiyaç duyduğunu söyleyebilirsin! 😊"""
         }
     }
     
@@ -96,13 +116,14 @@ Bu tercihlerin doğrultusunda sana uygun meslek alanlarını birlikte keşfedebi
         "GENEL_BELIRSIZLIK": [
             "ne okuyayım", "bilmiyorum", "kafam karışık", "karar veremiyorum",
             "hiçbir şey istemiyorum", "ne yapmak istediğimi bilmiyorum",
-            "hangi bölüm", "ne seçeyim", "öneriniz", "yardım edin"
+            "hangi bölüm", "ne seçeyim", "öneriniz", "yardım edin",
+            "hiçbir bölümü sevmiyorum", "ne yapmalıyım"
         ],
         
         "SIRALAMA_ENDISESI": [
             "kötü mü", "iyi mi", "yeter mi", "gelir mi", "sıralama",
             "bin", "puan", "başarısız", "düşük", "yüksek",
-            "geçer mi", "alır mı", "tutturabilir miyim"
+            "geçer mi", "alır mı", "tutturabilir miyim", "yaptım"
         ],
         
         "BOLUM_KARSILASTIRMA": [
@@ -112,7 +133,8 @@ Bu tercihlerin doğrultusunda sana uygun meslek alanlarını birlikte keşfedebi
         
         "GARANTI_ARAYISI": [
             "garanti", "en iyi", "işsiz kalmam", "iş bulur", "güvenli",
-            "kesin", "mutlaka", "garantili", "işsizlik", "iş imkanı"
+            "kesin", "mutlaka", "garantili", "işsizlik", "iş imkanı",
+            "hangi bölüm işsiz kalmaz", "en çok iş"
         ],
         
         "SEHIR_KARARSIZLIGI": [
@@ -128,6 +150,13 @@ Bu tercihlerin doğrultusunda sana uygun meslek alanlarını birlikte keşfedebi
         "MESLEK_SEKTOR_MERAK": [
             "ne iş", "hangi meslek", "çalışma alanı", "sektör",
             "iş yapar", "görev", "sorumluluk", "kariyer"
+        ],
+        
+        "META_BOT": [
+            "sen kimsin", "nasıl çalışıyorsun", "neler yapabilirsin",
+            "insanla mı konuşuyorum", "robot musun", "yapay zeka mısın",
+            "bana nasıl yardımcı olacaksın", "ne tür sorular sorabilirim",
+            "kim olduğunu", "ne yapabildiğini", "hangi konularda yardımcı"
         ]
     }
     
