@@ -53,6 +53,7 @@ META_BOT İNDİKATÖRLERİ:
 • "sen kimsin", "nasıl çalışıyorsun", "neler yapabilirsin"
 • "insanla mı konuşuyorum", "robot musun", "yapay zeka mısın"
 • "bana nasıl yardımcı olacaksın", "ne tür sorular sorabilirim"
+• "çalışma mekanizman", "yardım şekl", "kimle konuşuyorum"
 
 SELAMLAMA İNDİKATÖRLERİ:
 • "merhaba", "selam", "iyi günler", "nasılsın"
@@ -80,7 +81,11 @@ ENHANCED_QUESTION: Bilgisayar mühendisliği mezunlarının maaş durumu ve geli
 Güncel: "Ne okuyayım kafam çok karışık"
 STATUS: REHBERLİK_GEREKTİREN
 GUIDANCE_CATEGORY: GENEL_BELIRSIZLIK
-ENHANCED_QUESTION: Üniversite tercih sürecinde kararsızlık yaşıyorum, hangi bölümü seçeceğimi bilmiyorum.
+ÖRNEK 3:
+Güncel: "nasıl çalışıyorsun"
+STATUS: META_BOT
+GUIDANCE_CATEGORY: META_BOT
+ENHANCED_QUESTION: Bot'un çalışma mekanizması ve yardım şekli hakkında bilgi istiyor.
 """
 
     # Vector Arama - Daha etkili anahtar kelime genişletme
@@ -150,26 +155,48 @@ YANITLAMA STRATEJİSİ:
    - AKILLI BAĞLAM KULLANIMI: Önceki konuşma mevcut soruyla DOĞRUDAN alakalıysa dahil et
    - Farklı konu/soru türüyse önceki konuşmayı YOKSAY
    - Zoraki bağlantı kurma, doğal ve odaklanmış yanıt ver
+   - ÖNCEKİ KONUŞMADA BELİRTİLEN BİLGİLERİ KULLAN (ilgi alanları, sıralama, tercihler)
 
-3. SORU TİPİNİ BELİRLE:
+3. KİŞİSELLEŞTİRME KURALLARI:
+   - Kullanıcının belirttiği ilgi alanlarını yanıta entegre et
+   - Sıralama bilgisi varsa spesifik önerilerde bulun
+   - Genel tavsiye verme, kullanıcının durumuna özel yanıt ver
+   - Tekrar etme, her yanıtta yeni değer kat
+
+4. SORU TİPİNİ BELİRLE:
    - Genel rehberlik sorusu mu?
    - Spesifik veri/istatistik sorusu mu?
    - Önceki konuşmayla ilişkili mi?
 
-4. KAYNAK SEÇİMİ:
+5. KAYNAK SEÇİMİ:
    - Senin birikimin kaynaklarımızdan daha geniş, eğer Context1 veya Context2'de doğrudan soruya yanıt olabilecek bir bilgi yoksa kendi bilginden (veya contextlerden destek alarak) yanıt verebilirsin. 
    - Genel sorular: Kendi bilgin + Context1
    - İstatistik sorular: Context2 + Context1 + Kendi bilgin 
    - Önceki konuşma varsa: gerekliyse bağlamı dikkate al (daha çok son konuşmalar)
 
-5. KAYNAK BELİRTME: 
+6. KAYNAK BELİRTME: 
    - SADECE CSV verilerinden rakam/oran/istatistik paylaşırken:
      "2024 Cumhurbaşkanlığı Uni-Veri Veritabanında yer alan bilgiye göre..."
    - Diğer tüm durumlarda kaynak belirtme
 
 YANIT KURALLARI:
 • REHBERLİK MODUNDA: Template'e sadık kal, sokratik sorular sor, kullanıcıyı yönlendir
-• NORMAL MODDA: 3-5 cümle, net ve objektif
+• NORMAL MODDA: 3-4 cümle, net ve objektif, KİŞİSELLEŞTİRİLMİŞ (maksimum 400 kelime)
+• FORMATLAMA KURALLARI (ÇOK ÖNEMLİ): 
+  - Her madde arasında mutlaka boş bir satır bırak
+  - Numaralı liste örneği:
+    1. Birinci madde
+    
+    2. İkinci madde
+    
+    3. Üçüncü madde
+  - Sorular sorarken alt alta yaz:
+    👉 İlk soru?
+    
+    👉 İkinci soru?
+  - Paragraflar arasında boş satır kullan
+• TEKRAR ETME: Aynı bilgileri tekrar verme, her yanıtta yeni değer kat
+• KİŞİSELLEŞTİR: Kullanıcının belirttiği ilgi alanları, sıralama gibi bilgileri kullan
 • Önceki konuşmaya uygun ton SADECE alakalıysa
 • Context2'yi sadece istatistik sorularında kullan
 • Kendi vereceğin yanıt Context1'deki içerikten yanıta daha uygunsa kendi bilginle hareket edebilirsin.
@@ -178,7 +205,24 @@ YANIT KURALLARI:
 • Kullanıcıyı kaynak dokümanlarımıza yönlendirme sadece kendi bilgini zenginleştirecek noktada Context1 ve Context2 yi kullan.
 • Alakasız geçmişi zorlama, mevcut soruya odaklan
 
-Yanıt:"""
+Yanıt:
+
+ÖNEMLİ: Aşağıdaki format örneğindeki gibi maddeler arasında boş satır bırakarak yanıt ver. MUTLAKA tam cevap ver, yarıda kesme:
+
+ÖRNEK FORMAT:
+"Sıralamana uygun bölümler şunlar:
+
+1. İlk bölüm hakkında açıklama
+
+2. İkinci bölüm hakkında açıklama
+
+3. Üçüncü bölüm hakkında açıklama
+
+👉 İlk soru?
+
+👉 İkinci soru?"
+
+Bu formatı kullanarak EKSIKSIZ yanıt ver:"""
 
 # CSV Tetikleyici Kelimeler - Değişiklik yok
 CSV_KEYWORDS = [
