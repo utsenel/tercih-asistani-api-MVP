@@ -16,7 +16,7 @@ class LLMConfig:
     provider: LLMProvider
     model: str
     temperature: float
-    max_tokens: int = 500
+    max_tokens: int = 400
     max_retries: int = 3
     timeout: int = 100
     fallback_provider: Optional[LLMProvider] = None
@@ -72,7 +72,7 @@ class LLMConfigs:
         provider=LLMProvider.OPENAI, 
         model="gpt-4o-mini",  
         temperature=0.2,  # Düşük temperature - consistent output için
-        max_tokens=200,   # Artırıldı - context analysis için
+        max_tokens=150,   # Artırıldı - context analysis için
         timeout=45,
         max_retries=2,
         fallback_provider=LLMProvider.GOOGLE,
@@ -84,7 +84,7 @@ class LLMConfigs:
         provider=LLMProvider.OPENAI, 
         model="gpt-4o-mini", 
         temperature=0.3, 
-        max_tokens=500,  
+        max_tokens=300,  
         timeout=60,
         max_retries=2, 
         fallback_provider=LLMProvider.ANTHROPIC,
@@ -95,7 +95,7 @@ class LLMConfigs:
         provider=LLMProvider.OPENAI, 
         model="gpt-4o", 
         temperature=0.3, 
-        max_tokens=400, 
+        max_tokens=200, 
         timeout=60,
         max_retries=2, 
         fallback_provider=LLMProvider.ANTHROPIC,
