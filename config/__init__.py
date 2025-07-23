@@ -1,5 +1,5 @@
 """
-Konfigürasyon modülü - Smart Evaluator-Corrector ile güncellenmiş
+Konfigürasyon modülü - Tek Tutarlı Ton ile güncellenmiş
 """
 
 from .llm_config import (
@@ -12,7 +12,8 @@ from .llm_config import (
 )
 from .prompts import PromptTemplates, CSV_KEYWORDS
 from .settings import AppSettings, DatabaseSettings, MessageSettings, ValidationSettings
-from .guidance_templates import GuidanceTemplates
+
+# GuidanceTemplates kaldırıldı - artık kullanılmıyor
 
 __all__ = [
     "LLMConfigs",
@@ -26,6 +27,5 @@ __all__ = [
     "AppSettings",
     "DatabaseSettings", 
     "MessageSettings",
-    "ValidationSettings",
-    "GuidanceTemplates"
+    "ValidationSettings"
 ]
