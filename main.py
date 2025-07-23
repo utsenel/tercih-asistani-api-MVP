@@ -7,9 +7,9 @@ from dotenv import load_dotenv
 import logging
 import time
 
-# Local imports
+# Local imports - GuidanceTemplates kaldırıldı
 from chat_processor import TercihAsistaniProcessor
-from config import AppSettings, ValidationSettings, GuidanceTemplates
+from config import AppSettings, ValidationSettings
 
 # Environment değişkenlerini yükle
 load_dotenv()
@@ -37,7 +37,7 @@ app.add_middleware(
     allow_headers=AppSettings.CORS_HEADERS,
 )
 
-# Request/Response modelleri - Sources kaldırıldı
+# Request/Response modelleri
 class ChatRequest(BaseModel):
     message: str
     session_id: str = ValidationSettings.DEFAULT_SESSION_ID
@@ -92,7 +92,7 @@ async def root():
         "status": "active",
         "version": AppSettings.API_VERSION,
         "features": {
-            "guidance_system": True,
+            "unified_tone": True,  # Yeni özellik
             "csv_analysis": True,
             "vector_search": True,
             "memory_system": True
@@ -106,7 +106,7 @@ async def health_check():
         "status": "healthy",
         "version": AppSettings.API_VERSION,
         "service": AppSettings.API_TITLE,
-        "guidance_categories": len(GuidanceTemplates.TEMPLATES)
+        "approach": "unified_socratic_tone"  # Güncellenmiş
     }
 
 @app.post("/chat", response_model=ChatResponse)
@@ -203,44 +203,6 @@ async def test_connections():
             "timestamp": time.time()
         }
 
-@app.get("/debug-guidance")
-async def debug_guidance():
-    """
-    Guidance system debug endpoint
-    """
-    try:
-        test_questions = [
-            "Ne okuyayım bilmiyorum",
-            "300 bin sıralamayla iyi bir bölüm gelir mi?",
-            "Bilgisayar mühendisliği mi endüstri mühendisliği mi daha iyi?",
-            "Hangi bölüm garanti iş bulur?",
-            "İstanbul'da mı okumalıyım Ankara'da mı?",
-            "Vakıf üniversitesi mi devlet mi daha iyi?"
-        ]
-        
-        results = []
-        for question in test_questions:
-            category = GuidanceTemplates.detect_category(question)
-            template = GuidanceTemplates.get_template(category)
-            results.append({
-                "question": question,
-                "detected_category": category,
-                "has_template": bool(template),
-                "template_preview": template[:100] + "..." if template else ""
-            })
-        
-        return {
-            "status": "success",
-            "total_categories": len(GuidanceTemplates.TEMPLATES),
-            "test_results": results,
-            "all_categories": GuidanceTemplates.get_all_categories()
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "error": str(e)
-        }
-
 @app.get("/debug-astra")
 async def debug_astra():
     """
@@ -297,16 +259,11 @@ async def config_info():
             "sample_rows": CSVConfig.SAMPLE_ROWS,
             "max_rows_full_analysis": CSVConfig.MAX_ROWS_FOR_FULL_ANALYSIS
         },
-        "guidance_config": {
-            "categories": GuidanceTemplates.get_all_categories(),
-            "total_templates": len(GuidanceTemplates.TEMPLATES),
-            "category_details": {
-                category: {
-                    "description": template_data["description"],
-                    "approach": template_data["approach"]
-                }
-                for category, template_data in GuidanceTemplates.TEMPLATES.items()
-            }
+        "approach_config": {
+            "unified_tone": True,
+            "socratic_method": True,
+            "empathetic_responses": True,
+            "guidance_categories_removed": True
         },
         "api_info": {
             "title": AppSettings.API_TITLE,
@@ -319,7 +276,7 @@ if __name__ == "__main__":
     import uvicorn
     
     logger.info(f"Starting {AppSettings.API_TITLE} v{AppSettings.API_VERSION}")
-    logger.info(f"Guidance System: {len(GuidanceTemplates.TEMPLATES)} categories loaded")
+    logger.info(f"Unified Socratic Tone System Enabled")
     
     uvicorn.run(
         "main:app", 
