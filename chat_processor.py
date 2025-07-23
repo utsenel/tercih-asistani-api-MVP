@@ -15,12 +15,11 @@ from openai import OpenAI
 from memory import ConversationMemory
 from langchain_anthropic import ChatAnthropic
 
-# Config imports
+# Config imports - GuidanceTemplates kaldırıldı
 from config import (
     LLMConfigs, LLMProvider, VectorConfig, CSVConfig,
     PromptTemplates, CSV_KEYWORDS,
-    DatabaseSettings, MessageSettings, AppSettings,
-    GuidanceTemplates
+    DatabaseSettings, MessageSettings, AppSettings
 )
 
 logger = logging.getLogger(__name__)
@@ -52,11 +51,11 @@ class LLMFactory:
 
 class TercihAsistaniProcessor:
     """
-    Güncellenmiş processor - Smart Evaluator-Corrector + Rehberlik Sistemi
+    Güncellenmiş processor - Tek Tutarlı Ton Yaklaşımı
     """
     
     def __init__(self):
-        # YENİ: Smart Evaluator-Corrector
+        # Smart Evaluator-Corrector
         self.llm_smart_evaluator_corrector = None
         
         # KALAN LLM'LER
@@ -71,12 +70,11 @@ class TercihAsistaniProcessor:
         self.csv_data = None
         self.memory = ConversationMemory() 
         
-        # YENİ PROMPT
+        # PROMPT'LAR - guidance parametreleri kaldırıldı
         self.smart_evaluator_corrector_prompt = ChatPromptTemplate.from_template(
             PromptTemplates.SMART_EVALUATOR_CORRECTOR
         )
         
-        # KALAN PROMPT'LAR
         self.csv_agent_prompt = ChatPromptTemplate.from_template(PromptTemplates.CSV_AGENT)
         self.final_prompt = ChatPromptTemplate.from_template(PromptTemplates.FINAL_RESPONSE)
 
@@ -120,7 +118,7 @@ class TercihAsistaniProcessor:
             return ""
 
     async def initialize(self):
-        """Güncellenmiş başlatma - Smart Evaluator ile"""
+        """Güncellenmiş başlatma"""
         try:
             logger.info("TercihAsistaniProcessor initializing...")
             
@@ -130,7 +128,7 @@ class TercihAsistaniProcessor:
             # OpenAI client'ı başlat
             self._initialize_openai_client()
             
-            # YENİ LLM'leri sıralı başlat
+            # LLM'leri sıralı başlat
             await self._initialize_llms_new()
             
             # AstraDB bağlantısını native API ile başlat
@@ -175,7 +173,7 @@ class TercihAsistaniProcessor:
             raise
 
     async def _initialize_llms_new(self):
-        """YENİ LLM başlatma"""
+        """LLM başlatma"""
         llm_configs = {
             "smart_evaluator_corrector": LLMConfigs.SMART_EVALUATOR_CORRECTOR,
             "csv_agent": LLMConfigs.CSV_AGENT,
@@ -265,7 +263,7 @@ class TercihAsistaniProcessor:
             self.csv_data = None
 
     async def _smart_evaluate_and_correct(self, message: str, session_id: str) -> Dict[str, str]:
-        """YENİ: Smart Evaluator-Corrector fonksiyonu"""
+        """Smart Evaluator-Corrector fonksiyonu - Sadeleştirilmiş"""
         try:
             smart_start = time.time()
             
@@ -274,7 +272,6 @@ class TercihAsistaniProcessor:
                     logger.debug("Smart Evaluator-Corrector LLM unavailable, fallback")
                 return {
                     "status": "UYGUN",
-                    "guidance_category": "",
                     "enhanced_question": message
                 }
             
@@ -300,22 +297,19 @@ class TercihAsistaniProcessor:
             
             # Response'u parse et
             try:
-                # STATUS, GUIDANCE_CATEGORY ve ENHANCED_QUESTION'u extract et
+                # STATUS ve ENHANCED_QUESTION'u extract et
                 status_match = re.search(r'STATUS:\s*(\w+)', response)
-                guidance_match = re.search(r'GUIDANCE_CATEGORY:\s*([A-Z_]*)', response)
                 question_match = re.search(r'ENHANCED_QUESTION:\s*(.+)', response, re.DOTALL)
                 
                 if status_match and question_match:
                     status = status_match.group(1).strip()
-                    guidance_category = guidance_match.group(1).strip() if guidance_match else ""
                     enhanced_question = question_match.group(1).strip()
                     
                     if AppSettings.LOG_LLM_RESPONSES:
-                        logger.debug(f"Parse successful: Status={status}, Guidance={guidance_category}, Enhanced_len={len(enhanced_question)}")
+                        logger.debug(f"Parse successful: Status={status}, Enhanced_len={len(enhanced_question)}")
                     
                     return {
                         "status": status,
-                        "guidance_category": guidance_category,
                         "enhanced_question": enhanced_question
                     }
                 else:
@@ -323,49 +317,44 @@ class TercihAsistaniProcessor:
                         logger.debug("Parse failed - format error, using fallback")
                     
                     # Fallback parsing
-                    if "REHBERLİK_GEREKTİREN" in response.upper():
-                        # Guidance category'yi manual tespit et
-                        guidance_category = GuidanceTemplates.detect_category(message)
-                        return {"status": "REHBERLİK_GEREKTİREN", "guidance_category": guidance_category, "enhanced_question": message}
-                    elif "META_BOT" in response.upper():
-                        return {"status": "META_BOT", "guidance_category": "META_BOT", "enhanced_question": message}
+                    if "META_BOT" in response.upper():
+                        return {"status": "META_BOT", "enhanced_question": message}
                     elif "UYGUN" in response.upper():
-                        return {"status": "UYGUN", "guidance_category": "", "enhanced_question": message}
+                        return {"status": "UYGUN", "enhanced_question": message}
                     elif "SELAMLAMA" in response.upper():
-                        return {"status": "SELAMLAMA", "guidance_category": "", "enhanced_question": message}
+                        return {"status": "SELAMLAMA", "enhanced_question": message}
                     else:
-                        return {"status": "KAPSAM_DIŞI", "guidance_category": "", "enhanced_question": message}
+                        return {"status": "KAPSAM_DIŞI", "enhanced_question": message}
                         
             except Exception as parse_error:
                 logger.error(f"Smart Evaluator parse error: {parse_error}")
-                return {"status": "UYGUN", "guidance_category": "", "enhanced_question": message}
+                return {"status": "UYGUN", "enhanced_question": message}
             
         except Exception as e:
             smart_time = time.time() - smart_start
             logger.error(f"Smart Evaluator-Corrector error ({smart_time:.2f}s): {e}")
-            return {"status": "UYGUN", "guidance_category": "", "enhanced_question": message}
+            return {"status": "UYGUN", "enhanced_question": message}
 
     async def process_message(self, message: str, session_id: str = "default") -> Dict[str, Any]:
-        """YENİ akış ile mesaj işleme - Rehberlik sistemi dahil"""
+        """YENİ akış ile mesaj işleme - Tek Tutarlı Ton"""
         start_time = time.time()
         
         try:
             logger.info(f"Processing message: session={session_id}, length={len(message)}")
             
-            # Adım 1: YENİ Smart Evaluator-Corrector
+            # Adım 1: Smart Evaluator-Corrector
             smart_start = time.time()
             smart_result = await self._smart_evaluate_and_correct(message, session_id)
             smart_time = time.time() - smart_start
             
             status = smart_result["status"]
-            guidance_category = smart_result.get("guidance_category", "")
             enhanced_question = smart_result["enhanced_question"]
             
             # DETAYLI PERFORMANS LOGGING
             if os.getenv("DETAILED_TIMING", "false").lower() == "true":
-                logger.info(f"⏱️ Smart Evaluator: {smart_time:.2f}s, Status: {status}, Guidance: {guidance_category}")
+                logger.info(f"⏱️ Smart Evaluator: {smart_time:.2f}s, Status: {status}")
             
-            # Adım 2: Koşullu yönlendirme
+            # Adım 2: Özel durumlar (aynı kaldı)
             if status == "KAPSAM_DIŞI":
                 total_time = time.time() - start_time
                 logger.info(f"Out of scope request completed in {total_time:.2f}s")
@@ -382,58 +371,41 @@ class TercihAsistaniProcessor:
                     "metadata": {"processing_time": round(total_time, 2)}
                 }
             
-            # YENİ: Meta bot soruları
             if status == "META_BOT":
                 total_time = time.time() - start_time
                 logger.info(f"Meta bot request completed in {total_time:.2f}s")
                 
-                # META_BOT template'ini al
-                meta_template = GuidanceTemplates.get_template("META_BOT")
+                meta_response = """Ben bir üniversite tercih asistanıyım! 🎓
+
+**Nasıl çalışıyorum:**
+• Senin ilgi alanlarını, yeteneklerini ve hedeflerini anlamaya çalışırım
+• YKS tercihleri, bölüm seçimi, kariyer planlaması konularında yardımcı olurum
+• Sana hazır cevap vermek yerine, doğru soruları sorarak düşünmeni kolaylaştırırım
+
+**Ne konularda yardımcı olabilirim:**
+👉 Bölüm seçimi ve karşılaştırma
+👉 Üniversite/şehir tercihi
+👉 Kariyer planlama
+👉 İstihdam ve maaş verileri
+👉 Tercih stratejileri
+
+Sen de bana hangi konuda yardıma ihtiyaç duyduğunu söyleyebilirsin! 😊"""
                 
                 # Memory'ye kaydet
                 self.memory.add_message(session_id, "user", message)
-                self.memory.add_message(session_id, "assistant", meta_template)
+                self.memory.add_message(session_id, "assistant", meta_response)
                 
                 return {
-                    "response": meta_template,
+                    "response": meta_response,
                     "metadata": {
                         "processing_time": round(total_time, 2),
                         "mode": "meta_bot"
                     }
                 }
             
-            # YENİ: Rehberlik modu kontrolü
-            if status == "REHBERLİK_GEREKTİREN":
-                total_time = time.time() - start_time
-                logger.info(f"Guidance mode triggered: {guidance_category}")
-                
-                # Template al
-                guidance_template = GuidanceTemplates.get_template(guidance_category)
-                
-                if not guidance_template:
-                    # Fallback guidance
-                    guidance_template = """Seni daha iyi tanımak için birkaç soru sormama izin verir misin?
-                    
-👉 Hangi konular ilgini çeker?
-👉 Hangi derslerde daha keyif alıyorsun?
-👉 Nasıl bir çalışma ortamında mutlu olursun?
-
-Bu soruları konuştuktan sonra sana daha uygun tavsiyelerde bulunabilirim."""
-                
-                # Memory'ye kaydet
-                self.memory.add_message(session_id, "user", message)
-                self.memory.add_message(session_id, "assistant", guidance_template)
-                
-                return {
-                    "response": guidance_template,
-                    "metadata": {
-                        "processing_time": round(total_time, 2),
-                        "guidance_category": guidance_category,
-                        "mode": "guidance"
-                    }
-                }
+            # Adım 3: NORMAL AKIŞ - TÜM UYGUN SORULAR AYNI YAKLAŞIMLA
+            # REHBERLİK_GEREKTİREN durumu kaldırıldı - hepsi aynı akışa gidiyor
             
-            # Adım 3: NORMAL AKIŞ - PARALEL İŞLEMLER - Enhanced question ile
             parallel_start = time.time()
             
             # Task'ları oluştur
@@ -476,15 +448,13 @@ Bu soruları konuştuktan sonra sana daha uygun tavsiyelerde bulunabilirim."""
             conversation_history = self.memory.get_history(session_id)
             memory_time = time.time() - memory_start
             
-            # Adım 5: Final yanıt oluşturma - Enhanced question ile
+            # Adım 5: Final yanıt oluşturma - guidance parametreleri kaldırıldı
             final_start = time.time()
             final_response = await self._generate_final_response_safe(
                 question=enhanced_question,  # Enhanced question kullan
                 context1=context1,
                 context2=context2,
-                history=conversation_history,
-                guidance_category="",  # Normal modda boş
-                guidance_template=""   # Normal modda boş
+                history=conversation_history
             )
             final_time = time.time() - final_start
     
@@ -494,7 +464,7 @@ Bu soruları konuştuktan sonra sana daha uygun tavsiyelerde bulunabilirim."""
             self.memory.add_message(session_id, "assistant", final_response)
             memory_save_time = time.time() - memory_save_start
     
-            # PERFORMANS RAPORU - İYİLEŞTİRİLMİŞ
+            # PERFORMANS RAPORU
             total_time = time.time() - start_time
             
             # DETAYLI TIMING SADECE DETAILED_TIMING=true OLDUĞUNDA
@@ -530,8 +500,7 @@ Bu soruları konuştuktan sonra sana daha uygun tavsiyelerde bulunabilirim."""
                         "final_time": round(final_time, 2),
                         "enhanced_question": enhanced_question,
                         "original_question": message,
-                        "status": status,
-                        "guidance_category": guidance_category
+                        "status": status
                     } if AppSettings.DEBUG_MODE else {})
                 }
             }
@@ -773,8 +742,8 @@ Bu soruları konuştuktan sonra sana daha uygun tavsiyelerde bulunabilirim."""
             logger.error(f"CSV analysis error ({csv_time:.2f}s): {e}")
             return "CSV analysis error"
             
-    async def _generate_final_response_safe(self, question: str, context1: str, context2: str, history: str = "", guidance_category: str = "", guidance_template: str = "") -> str:
-        """Final yanıt oluşturma - Rehberlik modu dahil"""
+    async def _generate_final_response_safe(self, question: str, context1: str, context2: str, history: str = "") -> str:
+        """Final yanıt oluşturma - Guidance parametreleri kaldırıldı"""
         try:
             if not self.llm_final:
                 logger.error("Final LLM unavailable!")
@@ -785,9 +754,7 @@ Bu soruları konuştuktan sonra sana daha uygun tavsiyelerde bulunabilirim."""
                     question=question,
                     context1=context1,
                     context2=context2,
-                    history=history,
-                    guidance_category=guidance_category,
-                    guidance_template=guidance_template
+                    history=history
                 )
             )
             
@@ -867,7 +834,7 @@ Bu soruları konuştuktan sonra sana daha uygun tavsiyelerde bulunabilirim."""
         
         return results
 
-    # Debug fonksiyonları - isteğe bağlı
+    # Debug fonksiyonları - aynı kaldı
     async def debug_astra_documents(self) -> Dict[str, Any]:
         """AstraDB doküman yapısını debug et"""
         try:
