@@ -14,6 +14,7 @@ from astrapy import DataAPIClient
 from openai import OpenAI
 from memory import ConversationMemory
 from langchain_anthropic import ChatAnthropic
+from datetime import datetime
 
 # Config imports - GuidanceTemplates kaldırıldı
 from config import (
@@ -489,6 +490,25 @@ Sen de bana hangi konuda yardıma ihtiyaç duyduğunu söyleyebilirsin! 😊"""
             else:
                 # SADECE TOPLAM SÜRE
                 logger.info(f"Request completed in {total_time:.2f}s")
+
+            # Analytics kayıt
+            try:
+                analytics_data = {
+                    "ts": datetime.now().isoformat(),
+                    "session": session_id,
+                    "original_q": message,
+                    "enhanced_q": enhanced_question,
+                    "response": final_response,
+                    "status": status,
+                    "time": round(total_time, 2),
+                    "smart_time": round(smart_time, 2),
+                    "parallel_time": round(parallel_time, 2),
+                    "final_time": round(final_time, 2),
+                    "response_length": len(final_response)
+                }
+                self.memory.log_analytics(analytics_data)
+            except Exception as analytics_error:
+                logger.error(f"Analytics logging failed: {analytics_error}")
             
             return {
                 "response": final_response,
