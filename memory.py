@@ -101,3 +101,53 @@ class ConversationMemory:
         except Exception as e:
             logger.error(f"Memory get_history error: {e}")
             return ""
+    def log_analytics(self, data: dict):
+        """Analytics verilerini Redis'e kaydet"""
+        if not self.redis_client:
+            if AppSettings.LOG_MEMORY_OPERATIONS:
+                logger.debug("Redis client unavailable - analytics not saved")
+            return
+        
+        try:
+            # Timestamp ekleme eğer yoksa
+            if "ts" not in data:
+                from datetime import datetime
+                data["ts"] = datetime.now().isoformat()
+            
+            # JSON string'e çevir
+            log_entry = json.dumps(data, ensure_ascii=False)
+            
+            # Redis LIST'e ekle
+            self.redis_client.lpush("analytics:logs", log_entry)
+            
+            # İsteğe bağlı: son 1000 kaydı tut (disk alanı için)
+            self.redis_client.ltrim("analytics:logs", 0, 999)
+            
+            if AppSettings.LOG_MEMORY_OPERATIONS:
+                logger.debug(f"Analytics logged: session={data.get('session', 'unknown')}")
+            
+        except Exception as e:
+            logger.error(f"Analytics logging error: {e}")
+
+    def get_all_logs(self, limit: int = 100) -> List[dict]:
+        """Analytics loglarını al"""
+        if not self.redis_client:
+            return []
+        
+        try:
+            raw_logs = self.redis_client.lrange("analytics:logs", 0, limit-1)
+            logs = []
+            
+            for raw_log in raw_logs:
+                try:
+                    log_data = json.loads(raw_log)
+                    logs.append(log_data)
+                except json.JSONDecodeError as e:
+                    logger.error(f"Log parse error: {e}")
+                    continue
+            
+            return logs
+            
+        except Exception as e:
+            logger.error(f"Get analytics logs error: {e}")
+            return []
