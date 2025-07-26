@@ -237,6 +237,40 @@ async def debug_csv():
             "error": str(e)
         }
 
+@app.get("/analytics")
+async def get_analytics():
+    """
+    Analytics verilerini getir
+    """
+    try:
+        logs = processor.memory.get_all_logs(limit=200)
+        
+        # Basit istatistikler
+        stats = {
+            "total_requests": len(logs),
+            "avg_processing_time": round(sum(log.get("time", 0) for log in logs) / len(logs), 2) if logs else 0,
+            "status_distribution": {},
+            "recent_requests": logs[:10]  # Son 10 istek
+        }
+        
+        # Status dağılımı
+        for log in logs:
+            status = log.get("status", "UNKNOWN")
+            stats["status_distribution"][status] = stats["status_distribution"].get(status, 0) + 1
+        
+        return {
+            "status": "success",
+            "analytics": stats,
+            "timestamp": time.time()
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "timestamp": time.time()
+        }
+
 @app.get("/config-info")
 async def config_info():
     """
