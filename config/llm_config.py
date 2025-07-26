@@ -83,7 +83,7 @@ class LLMConfigs:
     CSV_AGENT = LLMConfig(
         provider=LLMProvider.OPENAI, 
         model="gpt-4o-mini", 
-        temperature=0.3, 
+        temperature=0.2, 
         max_tokens=250,  
         timeout=60,
         max_retries=2, 
@@ -95,7 +95,7 @@ class LLMConfigs:
         provider=LLMProvider.OPENAI, 
         model="gpt-4o", 
         temperature=0.3, 
-        max_tokens=250, 
+        max_tokens=275, 
         timeout=60,
         max_retries=2, 
         fallback_provider=LLMProvider.ANTHROPIC,
