@@ -250,7 +250,7 @@ async def get_analytics():
             "total_requests": len(logs),
             "avg_processing_time": round(sum(log.get("time", 0) for log in logs) / len(logs), 2) if logs else 0,
             "status_distribution": {},
-            "recent_requests": logs[:10]  # Son 10 istek
+            "recent_requests": logs  # Son 10 istek
         }
         
         # Status dağılımı
