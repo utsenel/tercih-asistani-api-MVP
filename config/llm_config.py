@@ -70,7 +70,7 @@ class LLMConfigs:
     # YENİ: Birleştirilmiş Smart Evaluator-Corrector
     SMART_EVALUATOR_CORRECTOR = LLMConfig(
         provider=LLMProvider.OPENAI, 
-        model="gpt-4o-mini",  
+        model="gpt-4o",  
         temperature=0.2,  # Düşük temperature - consistent output için
         max_tokens=150,   # Artırıldı - context analysis için
         timeout=45,
