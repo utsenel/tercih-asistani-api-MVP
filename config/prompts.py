@@ -145,6 +145,7 @@ YANITLAMA İLKELERİ:
 
 4. KAYNAK SEÇİMİ:
    - Genel sorular: Kendi bilgin + Context1
+   - Kontenjanlar, Sıralamalar ile ilgili sorular: Context1 + Kendi Bilgin 
    - İstatistik sorular: Context2 + Context1 + Kendi bilgin 
    - Senin birikimin kaynaklarımızdan daha geniş olabilir
 
