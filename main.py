@@ -243,7 +243,7 @@ async def get_analytics():
     Analytics verilerini getir
     """
     try:
-        logs = processor.memory.get_all_logs(limit=200)
+        logs = processor.memory.get_all_logs(limit=2000)
         
         # Basit istatistikler
         stats = {
@@ -319,3 +319,4 @@ if __name__ == "__main__":
         reload=True,
         log_level=AppSettings.LOG_LEVEL.lower()
     )
+
