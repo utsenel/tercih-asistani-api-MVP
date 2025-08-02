@@ -534,7 +534,7 @@ Sen de bana hangi konuda yardıma ihtiyaç duyduğunu söyleyebilirsin! 😊"""
             }                                            
 
     async def _get_vector_context_native(self, question: str) -> str:
-        """Native AstraDB ile vector arama - Temizlenmiş"""
+        """Native AstraDB ile vector arama - Debug logs eklendi"""
         try:
             vector_start = time.time()
             
@@ -542,20 +542,29 @@ Sen de bana hangi konuda yardıma ihtiyaç duyduğunu söyleyebilirsin! 😊"""
                 logger.warning("Astra collection unavailable")
                 return "Vector search unavailable"
             
+            # DEBUG: Başlangıç logu
+            logger.info(f"🔍 VECTOR DEBUG: Starting search for: '{question[:50]}...'")
+            
             if AppSettings.LOG_VECTOR_DETAILS:
                 logger.debug(f"Vector search starting: {question[:50]}...")
             
             # Embedding oluştur
             try:
                 query_embedding = self.get_embedding(question)
+                # DEBUG: Embedding başarısı
+                logger.info(f"🔍 VECTOR DEBUG: Embedding created successfully, dimensions: {len(query_embedding)}")
+                
                 if AppSettings.LOG_VECTOR_DETAILS:
                     logger.debug(f"Query embedding created: {len(query_embedding)} dimensions")
             except Exception as e:
-                logger.error(f"Embedding creation error: {e}")
+                logger.error(f"🔍 VECTOR DEBUG: Embedding creation FAILED: {e}")
                 return "Embedding creation failed"
             
             # Native vector search
             try:
+                # DEBUG: Search başlangıcı
+                logger.info(f"🔍 VECTOR DEBUG: Starting AstraDB search...")
+                
                 search_results = self.astra_collection.find(
                     {},
                     sort={"$vector": query_embedding},
@@ -576,12 +585,30 @@ Sen de bana hangi konuda yardıma ihtiyaç duyduğunu söyleyebilirsin! 😊"""
                 
                 docs = list(search_results)
                 
+                # DEBUG: Arama sonucu
+                logger.info(f"🔍 VECTOR DEBUG: Search completed, found {len(docs)} documents")
+                
                 if AppSettings.LOG_VECTOR_DETAILS:
                     logger.debug(f"Found {len(docs)} documents")
                 
                 if not docs:
-                    logger.warning("No documents found")
+                    logger.warning("🔍 VECTOR DEBUG: No documents found in search results")
                     return "No relevant documents found"
+                
+                # DEBUG: Her doküman için detay
+                for i, doc in enumerate(docs[:3]):  # İlk 3 dökümanı logla
+                    doc_keys = list(doc.keys())
+                    logger.info(f"🔍 VECTOR DEBUG: Doc {i+1} keys: {doc_keys}")
+                    
+                    # İçerik kontrolü
+                    if '$vectorize' in doc and doc['$vectorize']:
+                        content_preview = str(doc['$vectorize'])[:100]
+                        logger.info(f"🔍 VECTOR DEBUG: Doc {i+1} $vectorize content: '{content_preview}...'")
+                    elif 'text' in doc and doc['text']:
+                        content_preview = str(doc['text'])[:100]
+                        logger.info(f"🔍 VECTOR DEBUG: Doc {i+1} text content: '{content_preview}...'")
+                    else:
+                        logger.warning(f"🔍 VECTOR DEBUG: Doc {i+1} has NO readable content!")
                 
                 # Doküman içeriklerini birleştir
                 context_parts = []
@@ -606,7 +633,11 @@ Sen de bana hangi konuda yardıma ihtiyaç duyduğunu söyleyebilirsin! 😊"""
                                     break
                         
                         if not content:
+                            logger.warning(f"🔍 VECTOR DEBUG: Doc {i+1} - No content found in any field")
                             continue
+                        
+                        # DEBUG: İçerik işleme
+                        logger.info(f"🔍 VECTOR DEBUG: Doc {i+1} - Using '{content_source}' field, length: {len(content)} chars")
                         
                         # İçeriği kısalt
                         if len(content) > 800:
@@ -619,18 +650,23 @@ Sen de bana hangi konuda yardıma ihtiyaç duyduğunu söyleyebilirsin! 😊"""
                             logger.debug(f"Document {i+1} processed: {len(content)} chars")
                         
                         if total_chars > 2000:
+                            logger.info(f"🔍 VECTOR DEBUG: Reached 2000 char limit, stopping at doc {i+1}")
                             break
                             
                     except Exception as doc_error:
-                        logger.error(f"Document {i+1} processing error: {doc_error}")
+                        logger.error(f"🔍 VECTOR DEBUG: Document {i+1} processing error: {doc_error}")
                         continue
                 
                 if not context_parts:
-                    logger.error("No documents could be processed!")
+                    logger.error("🔍 VECTOR DEBUG: CRITICAL - No documents could be processed!")
                     return "Documents could not be processed"
                 
                 final_context = "\n\n".join(context_parts)
                 vector_time = time.time() - vector_start
+                
+                # DEBUG: Final sonuç
+                logger.info(f"🔍 VECTOR DEBUG: SUCCESS - Created context with {len(context_parts)} docs, {len(final_context)} total chars")
+                logger.info(f"🔍 VECTOR DEBUG: Final context preview: '{final_context[:150]}...'")
                 
                 if AppSettings.DETAILED_TIMING:
                     logger.debug(f"Vector search completed ({vector_time:.2f}s): {len(context_parts)} docs, {len(final_context)} chars")
@@ -638,12 +674,12 @@ Sen de bana hangi konuda yardıma ihtiyaç duyduğunu söyleyebilirsin! 😊"""
                 return final_context
                     
             except Exception as search_error:
-                logger.error(f"Vector search error: {search_error}")
+                logger.error(f"🔍 VECTOR DEBUG: Vector search FAILED: {search_error}")
                 return "Vector search failed"
             
         except Exception as e:
             vector_time = time.time() - vector_start
-            logger.error(f"Vector context general error ({vector_time:.2f}s): {e}")
+            logger.error(f"🔍 VECTOR DEBUG: General error ({vector_time:.2f}s): {e}")
             return "Vector search general error"
 
     async def _get_csv_context_safe(self, question: str) -> str:
@@ -764,6 +800,12 @@ Sen de bana hangi konuda yardıma ihtiyaç duyduğunu söyleyebilirsin! 😊"""
             
     async def _generate_final_response_safe(self, question: str, context1: str, context2: str, history: str = "") -> str:
         """Final yanıt oluşturma - Guidance parametreleri kaldırıldı"""
+        logger.info(f"🎯 FINAL DEBUG: Question: '{question[:50]}...'")
+        logger.info(f"🎯 FINAL DEBUG: Context1 (Vector) length: {len(context1)} chars")
+        logger.info(f"🎯 FINAL DEBUG: Context1 preview: '{context1[:100]}...'")
+        logger.info(f"🎯 FINAL DEBUG: Context2 (CSV) length: {len(context2)} chars")
+
+        
         try:
             if not self.llm_final:
                 logger.error("Final LLM unavailable!")
@@ -907,3 +949,4 @@ Sen de bana hangi konuda yardıma ihtiyaç duyduğunu söyleyebilirsin! 😊"""
             
         except Exception as e:
             return {"error": f"CSV debug error: {str(e)}"}
+
