@@ -70,7 +70,7 @@ class LLMConfigs:
     # YENİ: Birleştirilmiş Smart Evaluator-Corrector
     SMART_EVALUATOR_CORRECTOR = LLMConfig(
         provider=LLMProvider.OPENAI, 
-        model="gpt-4o",  
+        model="gpt-4.1",  
         temperature=0.2,  # Düşük temperature - consistent output için
         max_tokens=150,   # Artırıldı - context analysis için
         timeout=45,
@@ -82,7 +82,7 @@ class LLMConfigs:
     # KALAN MODELLER - değişmedi
     CSV_AGENT = LLMConfig(
         provider=LLMProvider.OPENAI, 
-        model="gpt-4o-mini", 
+        model="gpt-4.1-mini", 
         temperature=0.2, 
         max_tokens=250,  
         timeout=60,
@@ -93,7 +93,7 @@ class LLMConfigs:
     
     FINAL_RESPONSE = LLMConfig(
         provider=LLMProvider.OPENAI, 
-        model="gpt-4o", 
+        model="gpt-4.1", 
         temperature=0.3, 
         max_tokens=250, 
         timeout=60,
@@ -199,3 +199,4 @@ class FallbackConfig:
     }
     MAX_FALLBACK_ATTEMPTS = 2
     FALLBACK_DELAY = 1.0
+
